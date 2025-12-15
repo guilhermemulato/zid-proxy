@@ -1,0 +1,7 @@
+/etc/inc/priv/zid-proxy.priv.inc
+%%PREFIX%%/pkg/zid-proxy.xml
+%%PREFIX%%/pkg/zid-proxy.inc
+%%PREFIX%%/www/zid-proxy_rules.php
+%%PREFIX%%/www/zid-proxy_log.php
+%%DATADIR%%/info.xml
+@dir %%PREFIX%%/etc/zid-proxy

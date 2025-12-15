@@ -1,0 +1,19 @@
+# zid-proxy Access Rules
+# Format: TYPE;IP_OR_CIDR;HOSTNAME
+# TYPE: ALLOW or BLOCK
+# ALLOW rules take priority over BLOCK rules
+# Default action (no match): ALLOW
+
+# Examples:
+
+# Block social media for entire subnet
+BLOCK;192.168.1.0/24;*.facebook.com
+BLOCK;192.168.1.0/24;*.twitter.com
+BLOCK;192.168.1.0/24;*.instagram.com
+
+# But allow specific host to access Facebook
+ALLOW;192.168.1.100;*.facebook.com
+
+# Block streaming for specific host
+BLOCK;192.168.1.50;*.netflix.com
+BLOCK;192.168.1.50;*.youtube.com

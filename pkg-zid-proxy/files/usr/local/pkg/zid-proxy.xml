@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<packagegui>
+	<copyright>
+		<![CDATA[
+/*
+ * zid-proxy.xml
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ */
+		]]>
+	</copyright>
+	<name>zidproxy</name>
+	<title>Services: ZID Proxy</title>
+	<include_file>/usr/local/pkg/zid-proxy.inc</include_file>
+	<aftersaveredirect>/pkg.php?xml=zid-proxy.xml</aftersaveredirect>
+
+	<menu>
+		<name>ZID Proxy</name>
+		<tooltiptext>Configure SNI-based transparent HTTPS proxy</tooltiptext>
+		<section>Services</section>
+		<url>/pkg.php?xml=zid-proxy.xml</url>
+	</menu>
+
+	<service>
+		<name>zid_proxy</name>
+		<rcfile>zid-proxy.sh</rcfile>
+		<executable>zid-proxy</executable>
+		<description><![CDATA[ZID Proxy - SNI-based transparent HTTPS filtering proxy]]></description>
+	</service>
+
+	<tabs>
+		<tab>
+			<text>Settings</text>
+			<url>/pkg.php?xml=zid-proxy.xml</url>
+			<active/>
+		</tab>
+		<tab>
+			<text>Access Rules</text>
+			<url>/zid-proxy_rules.php</url>
+		</tab>
+		<tab>
+			<text>Logs</text>
+			<url>/zid-proxy_log.php</url>
+		</tab>
+	</tabs>
+
+	<fields>
+		<field>
+			<type>listtopic</type>
+			<name>General Settings</name>
+		</field>
+		<field>
+			<fielddescr>Enable</fielddescr>
+			<fieldname>enable</fieldname>
+			<type>checkbox</type>
+			<description><![CDATA[Enable ZID Proxy service]]></description>
+		</field>
+		<field>
+			<fielddescr>Listen Interface</fielddescr>
+			<fieldname>interface</fieldname>
+			<type>interfaces_selection</type>
+			<hideinterfaceregex>loopback</hideinterfaceregex>
+			<description><![CDATA[Select the interface where ZID Proxy will listen for connections.<br/>
+			<strong>Note:</strong> You will need to configure a firewall rule to redirect HTTPS traffic to this proxy.]]></description>
+		</field>
+		<field>
+			<fielddescr>Listen Port</fielddescr>
+			<fieldname>listen_port</fieldname>
+			<type>input</type>
+			<size>6</size>
+			<default>3129</default>
+			<description><![CDATA[Port to listen on. Default: 3129<br/>
+			<strong>Note:</strong> Using port 443 directly may conflict with other services. It's recommended to use a different port and set up NAT redirection.]]></description>
+		</field>
+		<field>
+			<type>listtopic</type>
+			<name>Logging</name>
+		</field>
+		<field>
+			<fielddescr>Enable Logging</fielddescr>
+			<fieldname>enable_logging</fieldname>
+			<type>checkbox</type>
+			<default>on</default>
+			<description><![CDATA[Enable connection logging to /var/log/zid-proxy.log]]></description>
+		</field>
+		<field>
+			<type>listtopic</type>
+			<name>Advanced Settings</name>
+		</field>
+		<field>
+			<fielddescr>Connection Timeout</fielddescr>
+			<fieldname>timeout</fieldname>
+			<type>input</type>
+			<size>6</size>
+			<default>30</default>
+			<description><![CDATA[Connection timeout in seconds. Default: 30]]></description>
+		</field>
+	</fields>
+
+	<custom_php_install_command>zidproxy_install();</custom_php_install_command>
+	<custom_php_deinstall_command>zidproxy_deinstall();</custom_php_deinstall_command>
+	<custom_php_resync_config_command>zidproxy_resync();</custom_php_resync_config_command>
+	<custom_php_validation_command>zidproxy_validate($_POST, $input_errors);</custom_php_validation_command>
+</packagegui>

@@ -1,0 +1,110 @@
+#!/bin/sh
+#
+# PROVIDE: zid_proxy
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf to enable zid-proxy:
+#
+# zid_proxy_enable="YES"
+# zid_proxy_listen=":443"           # Optional: listen address
+# zid_proxy_rules="/usr/local/etc/zid-proxy/access_rules.txt"  # Optional: rules file
+# zid_proxy_log="/var/log/zid-proxy.log"  # Optional: log file
+#
+
+. /etc/rc.subr
+
+name="zid_proxy"
+rcvar="zid_proxy_enable"
+
+load_rc_config $name
+
+: ${zid_proxy_enable:="NO"}
+: ${zid_proxy_listen:=":443"}
+: ${zid_proxy_rules:="/usr/local/etc/zid-proxy/access_rules.txt"}
+: ${zid_proxy_log:="/var/log/zid-proxy.log"}
+: ${zid_proxy_pid:="/var/run/zid-proxy.pid"}
+: ${zid_proxy_user:="root"}
+
+pidfile="${zid_proxy_pid}"
+procname="/usr/local/sbin/zid-proxy"
+command="/usr/sbin/daemon"
+command_args="-f -p ${pidfile} ${procname} \
+    -listen ${zid_proxy_listen} \
+    -rules ${zid_proxy_rules} \
+    -log ${zid_proxy_log} \
+    -pid ${zid_proxy_pid}"
+
+start_precmd="zid_proxy_prestart"
+stop_postcmd="zid_proxy_poststop"
+extra_commands="reload status"
+reload_cmd="zid_proxy_reload"
+status_cmd="zid_proxy_status"
+
+zid_proxy_prestart()
+{
+    # Ensure config directory exists
+    mkdir -p /usr/local/etc/zid-proxy
+
+    # Create default rules file if it doesn't exist
+    if [ ! -f ${zid_proxy_rules} ]; then
+        cat > ${zid_proxy_rules} << 'RULES_EOF'
+# zid-proxy Access Rules
+# Format: TYPE;IP_OR_CIDR;HOSTNAME
+# TYPE: ALLOW or BLOCK
+# ALLOW rules take priority over BLOCK rules
+# Default action (no match): ALLOW
+
+# Example rules:
+# BLOCK;192.168.1.0/24;*.facebook.com
+# ALLOW;192.168.1.100;*.facebook.com
+RULES_EOF
+        echo "Created default rules file: ${zid_proxy_rules}"
+    fi
+
+    # Ensure log file exists and is writable
+    touch ${zid_proxy_log}
+    chown ${zid_proxy_user} ${zid_proxy_log}
+
+    return 0
+}
+
+zid_proxy_poststop()
+{
+    rm -f ${pidfile}
+}
+
+zid_proxy_reload()
+{
+    if [ -f ${pidfile} ]; then
+        echo "Reloading ${name} rules..."
+        kill -HUP $(cat ${pidfile})
+        echo "Rules reloaded."
+    else
+        echo "${name} is not running."
+        return 1
+    fi
+}
+
+zid_proxy_status()
+{
+    if [ -f ${pidfile} ]; then
+        pid=$(cat ${pidfile})
+        if kill -0 ${pid} 2>/dev/null; then
+            echo "${name} is running as pid ${pid}."
+            # Show rule count if possible
+            rule_count=$(wc -l < ${zid_proxy_rules} 2>/dev/null | tr -d ' ')
+            echo "Rules file: ${zid_proxy_rules} (${rule_count} lines)"
+            echo "Log file: ${zid_proxy_log}"
+            return 0
+        else
+            echo "${name} is not running (stale pid file)."
+            return 1
+        fi
+    else
+        echo "${name} is not running."
+        return 1
+    fi
+}
+
+run_rc_command "$1"

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pfsensepkgs>
+	<package>
+		<name>pfSense-pkg-zid-proxy</name>
+		<internal_name>zid-proxy</internal_name>
+		<descr><![CDATA[SNI-based transparent HTTPS proxy with IP/hostname dual-factor filtering.
+
+Intercepts TLS traffic and filters based on source IP address and destination hostname (extracted from SNI extension) without terminating TLS.]]></descr>
+		<version>1.0.0</version>
+		<pkginfolink>https://github.com/guilherme/zid-proxy</pkginfolink>
+		<config_file>/usr/local/pkg/zid-proxy.xml</config_file>
+		<configurationfile>zid-proxy.xml</configurationfile>
+		<include_file>/usr/local/pkg/zid-proxy.inc</include_file>
+		<maintainer>guilherme@example.com</maintainer>
+		<website>https://github.com/guilherme/zid-proxy</website>
+		<category>Network Management</category>
+		<status>Stable</status>
+		<required_version>2.7.0</required_version>
+		<only_for_archs>amd64</only_for_archs>
+	</package>
+</pfsensepkgs>

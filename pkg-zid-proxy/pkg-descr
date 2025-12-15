@@ -1,0 +1,17 @@
+ZID Proxy - SNI-based Transparent HTTPS Proxy for pfSense
+
+This package provides a transparent proxy for HTTPS traffic that performs
+dual-factor filtering based on source IP address and destination hostname
+(extracted from TLS SNI extension without terminating TLS).
+
+Features:
+- Transparent HTTPS proxy (port 443)
+- SNI hostname extraction without TLS termination
+- IP/CIDR-based source filtering
+- Wildcard hostname matching (*.example.com)
+- ALLOW/BLOCK rules with ALLOW priority
+- Runtime rule reloading via SIGHUP
+- Detailed connection logging
+- pfSense web interface integration
+
+WWW: https://github.com/guilherme/zid-proxy
