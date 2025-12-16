@@ -99,15 +99,97 @@ chmod 644 /etc/inc/priv/zid-proxy.priv.inc
 
 echo ""
 echo "========================================="
-echo " Installation complete!"
+echo " File Installation Complete!"
 echo "========================================="
 echo ""
-echo "Next steps:"
-echo "1. Navigate to Services > ZID Proxy in the pfSense web interface"
-echo "2. Enable the service and configure the listen interface/port"
-echo "3. Add access rules on the 'Access Rules' tab"
-echo "4. Configure firewall NAT to redirect HTTPS traffic to the proxy"
+
+# Run activation script
+SCRIPT_DIR=$(dirname "$0")
+
+if [ -f "${SCRIPT_DIR}/activate-package.php" ]; then
+    echo "Activating package (creating RC script)..."
+    php "${SCRIPT_DIR}/activate-package.php"
+    activation_result=$?
+    echo ""
+
+    if [ $activation_result -eq 0 ]; then
+        # Register the package automatically
+        echo "========================================="
+        echo " Package Registration"
+        echo "========================================="
+        echo ""
+        echo "Registering package with pfSense..."
+
+        if [ -f "${SCRIPT_DIR}/register-package.php" ]; then
+            php "${SCRIPT_DIR}/register-package.php"
+            register_result=$?
+            echo ""
+
+            if [ $register_result -eq 0 ]; then
+                echo "[OK] Package registered successfully"
+                echo ""
+
+                # Reload pfSense GUI to make menu appear
+                echo "Reloading pfSense web interface..."
+                /usr/local/sbin/pfSsh.php playback reloadwebgui 2>/dev/null
+                reload_result=$?
+
+                if [ $reload_result -eq 0 ]; then
+                    echo "[OK] Web interface reloaded"
+                else
+                    echo "[WARNING] GUI reload may have failed"
+                    echo "          You may need to restart PHP-FPM or reboot pfSense"
+                fi
+                echo ""
+            else
+                echo "[ERROR] Package registration failed!"
+                echo "        You can try running manually:"
+                echo "        php ${SCRIPT_DIR}/register-package.php"
+                echo ""
+            fi
+        else
+            echo "[ERROR] register-package.php not found"
+            echo ""
+        fi
+    else
+        echo "Warning: Package activation failed!"
+        echo "You may need to run 'php ${SCRIPT_DIR}/activate-package.php' manually."
+        echo ""
+    fi
+else
+    echo "Warning: activate-package.php not found"
+    echo "You may need to manually create the RC script."
+    echo ""
+fi
+
+echo "========================================="
+echo " Installation Summary"
+echo "========================================="
 echo ""
-echo "If you haven't installed the binary yet:"
-echo "  scp build/zid-proxy root@pfsense:${PREFIX}/sbin/"
+echo "Files installed:"
+echo "  • Binary: ${PREFIX}/sbin/zid-proxy"
+echo "  • Package files: ${PREFIX}/pkg/zid-proxy.*"
+echo "  • Web interface: ${PREFIX}/www/zid-proxy_*.php"
+echo "  • RC script: ${PREFIX}/etc/rc.d/zid-proxy.sh"
+echo ""
+echo "Next steps:"
+echo ""
+echo "1. Test the service:"
+echo "   /usr/local/etc/rc.d/zid-proxy.sh start"
+echo "   /usr/local/etc/rc.d/zid-proxy.sh status"
+echo ""
+echo "2. Access pfSense web interface:"
+echo "   - Navigate to Services > ZID Proxy"
+echo "   - Enable the service and configure listen interface/port"
+echo "   - Add access rules on the 'Access Rules' tab"
+echo ""
+echo "3. Configure firewall NAT:"
+echo "   - Go to Firewall > NAT > Port Forward"
+echo "   - Redirect HTTPS (443) traffic to the proxy port"
+echo ""
+echo "Troubleshooting:"
+echo "  • Run diagnostics: sh ${SCRIPT_DIR}/diagnose.sh"
+echo "  • View logs: tail -f /var/log/zid-proxy.log"
+echo "  • Manual activation: php ${SCRIPT_DIR}/activate-package.php"
+echo "  • Register package: php ${SCRIPT_DIR}/register-package.php"
 echo ""

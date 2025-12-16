@@ -58,3 +58,4 @@ scripts/rc.d/zid-proxy     # FreeBSD service script
 - SNI Proxy pattern: https://www.agwa.name/blog/post/writing_an_sni_proxy_in_go
 - pfSense packages: https://docs.netgate.com/pfsense/en/latest/development/develop-packages.html
 - e2guardian reference: https://github.com/marcelloc/e2guardian
+- Sempre ao final, se necessario gere novamente os binarios e compacte todos os arquivos em um tar com a nova versao, para facilitar o scp

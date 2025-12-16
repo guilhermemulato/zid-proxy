@@ -98,18 +98,23 @@ function zidproxy_resync() {
 
 	if (isset($zidproxy_config['enable']) && $zidproxy_config['enable'] == 'on') {
 		// Get configuration values
-		$interface = $zidproxy_config['interface'] ?? 'lan';
+		$interface = $zidproxy_config['interface'] ?? 'all';
 		$port = $zidproxy_config['listen_port'] ?? '3129';
 		$timeout = $zidproxy_config['timeout'] ?? '30';
 		$enable_logging = isset($zidproxy_config['enable_logging']) && $zidproxy_config['enable_logging'] == 'on';
 
-		// Get interface IP
-		$if_ip = get_interface_ip($interface);
-		if (empty($if_ip)) {
-			$if_ip = '0.0.0.0';
+		// Determine listen address
+		if ($interface == 'all') {
+			// Listen on all interfaces (0.0.0.0) for NAT compatibility
+			$listen_addr = "0.0.0.0:{$port}";
+		} else {
+			// Listen on specific interface IP
+			$if_ip = get_interface_ip($interface);
+			if (empty($if_ip)) {
+				$if_ip = '0.0.0.0';
+			}
+			$listen_addr = "{$if_ip}:{$port}";
 		}
-
-		$listen_addr = "{$if_ip}:{$port}";
 
 		// Write rc.conf variables
 		set_rcvar('zid_proxy_enable', 'YES');
@@ -227,7 +232,14 @@ function zidproxy_save_rules($rules) {
 
 	write_config("ZID Proxy rules updated");
 	zidproxy_sync_rules();
-	zidproxy_reload();
+
+	// Ensure rules are reloaded by restarting the service
+	// This is more reliable than SIGHUP in some cases
+	if (zidproxy_status()) {
+		zidproxy_stop();
+		sleep(1);
+		zidproxy_start();
+	}
 }
 
 /**

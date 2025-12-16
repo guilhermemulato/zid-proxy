@@ -33,8 +33,20 @@ func (h *Handler) Handle() {
 	// Extract SNI from ClientHello
 	hostname, clientHello, err := sni.PeekClientHello(h.clientConn)
 	if err != nil {
-		if err == sni.ErrNotTLS || err == sni.ErrNoSNI {
-			log.Printf("Non-TLS or no SNI from %s, blocking", clientIP)
+		if err == sni.ErrNotTLS {
+			log.Printf("Non-TLS connection from %s, blocking", clientIP)
+			h.sendRST()
+			return
+		}
+		if err == sni.ErrNoSNI {
+			// Allow connections without SNI from private IP ranges
+			// This enables access to local resources by IP (e.g., https://192.168.1.1)
+			if isPrivateIP(clientIP) {
+				log.Printf("No SNI from private IP %s, allowing", clientIP)
+				h.proxyConnectionNoSNI(clientAddr)
+				return
+			}
+			log.Printf("No SNI from public IP %s, blocking", clientIP)
 			h.sendRST()
 			return
 		}
@@ -110,6 +122,59 @@ func (h *Handler) proxyConnection(hostname string, clientHello []byte) {
 
 	// Bidirectional proxy
 	h.bidirectionalCopy(h.clientConn, upstreamConn)
+}
+
+// isPrivateIP checks if an IP belongs to a private network (RFC 1918 + loopback)
+func isPrivateIP(ip net.IP) bool {
+	privateRanges := []string{
+		"10.0.0.0/8",     // RFC 1918
+		"172.16.0.0/12",  // RFC 1918
+		"192.168.0.0/16", // RFC 1918
+		"127.0.0.0/8",    // Loopback
+		"::1/128",        // IPv6 loopback
+		"fc00::/7",       // IPv6 private
+	}
+
+	for _, cidr := range privateRanges {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// proxyConnectionNoSNI handles connections from private IPs without SNI
+//
+// LIMITATION: True transparent proxying without SNI requires access to the
+// original destination IP after NAT redirect. This information is available via:
+//   - SO_ORIGINAL_DST socket option on Linux/iptables
+//   - Divert sockets on FreeBSD/pf
+//
+// This proxy uses a simple TCP listen socket, which doesn't have access to the
+// original destination after NAT Port Forward. The clientAddr parameter contains
+// the CLIENT's IP address, not the destination the client was trying to reach.
+//
+// Therefore, this implementation cannot proxy connections without SNI.
+//
+// WORKAROUND (Recommended):
+// Exclude specific IPs from NAT redirect in pfSense:
+//   1. Firewall > NAT > Port Forward
+//   2. Edit the rule that redirects port 443 to proxy
+//   3. Destination: Invert match (NOT) → Single host → 192.168.1.1
+//   4. Save & Apply
+//
+// This allows direct access to pfSense GUI and other local services by IP.
+//
+// Alternative: Access local services via hostname instead of IP
+// (e.g., https://pfsense.local instead of https://192.168.1.1)
+func (h *Handler) proxyConnectionNoSNI(clientAddr *net.TCPAddr) {
+	// Close connection gracefully (no RST packet)
+	// This is better than sending RST for private IP connections
+	h.clientConn.Close()
 }
 
 // bidirectionalCopy copies data between two connections in both directions

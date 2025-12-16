@@ -164,11 +164,11 @@ pkg-zid-proxy/               # pfSense package files
   files/usr/local/www/       # Web interface pages
 ```
 
-## pfSense GUI Installation (Phase 2)
+## pfSense GUI Installation
 
 The `pkg-zid-proxy/` directory contains files for pfSense web interface integration.
 
-### Quick Installation
+### Quick Installation (Recommended)
 
 ```bash
 # On your build machine
@@ -181,11 +181,62 @@ scp -r build/zid-proxy pkg-zid-proxy root@pfsense:/tmp/
 ssh root@pfsense
 cd /tmp/pkg-zid-proxy
 sh install.sh
-cp /tmp/build/zid-proxy /usr/local/sbin/
-chmod +x /usr/local/sbin/zid-proxy
+```
+
+The installer will:
+1. Copy all package files to their correct locations
+2. Execute activation hooks to create the RC script
+3. Ask if you want to register the package in pfSense
+4. Provide instructions for completing the setup
+
+After installation:
+- Test the service: `/usr/local/etc/rc.d/zid-proxy.sh start`
+- Access **Services > ZID Proxy** in the pfSense web interface
+- If the menu doesn't appear, reload the web interface or restart pfSense
+
+### Troubleshooting
+
+If you encounter issues with the installation:
+
+```bash
+# Run diagnostic script
+cd /tmp/pkg-zid-proxy
+sh diagnose.sh
+```
+
+Common issues and solutions:
+
+**Service command not found:**
+```bash
+# Manually activate the package
+php activate-package.php
+```
+
+**Menu doesn't appear in web interface:**
+```bash
+# Register the package
+php register-package.php
+
+# Then reload web interface
+/usr/local/sbin/pfSsh.php playback reloadwebgui
+
+# OR restart pfSense
+shutdown -r now
+```
+
+**Need to reinstall:**
+```bash
+# Uninstall first
+cd /tmp/pkg-zid-proxy
+sh uninstall.sh
+
+# Then reinstall
+sh install.sh
 ```
 
 ### Manual Installation
+
+If the automated installer doesn't work, you can install manually:
 
 ```bash
 # Copy binary
@@ -198,6 +249,25 @@ scp pkg-zid-proxy/files/usr/local/www/zid-proxy_rules.php root@pfsense:/usr/loca
 scp pkg-zid-proxy/files/usr/local/www/zid-proxy_log.php root@pfsense:/usr/local/www/
 scp pkg-zid-proxy/files/etc/inc/priv/zid-proxy.priv.inc root@pfsense:/etc/inc/priv/
 scp pkg-zid-proxy/files/usr/local/share/pfSense-pkg-zid-proxy/info.xml root@pfsense:/usr/local/share/pfSense-pkg-zid-proxy/
+
+# Activate the package
+ssh root@pfsense
+php -r "require_once('/usr/local/pkg/zid-proxy.inc'); zidproxy_install();"
+```
+
+### Standalone Installation (Without GUI)
+
+If you prefer to use the service without the pfSense GUI:
+
+```bash
+# Copy binary and RC script
+scp build/zid-proxy root@pfsense:/usr/local/sbin/
+scp scripts/rc.d/zid-proxy root@pfsense:/usr/local/etc/rc.d/
+ssh root@pfsense "chmod +x /usr/local/etc/rc.d/zid-proxy"
+
+# Enable and start service
+ssh root@pfsense "echo 'zid_proxy_enable=\"YES\"' >> /etc/rc.conf.local"
+ssh root@pfsense "service zid-proxy start"
 ```
 
 ### GUI Features
@@ -221,6 +291,43 @@ To intercept HTTPS traffic transparently:
    - Destination Port: 443
    - Redirect Target IP: 127.0.0.1 (or interface IP)
    - Redirect Target Port: 3129 (or your configured port)
+
+## Known Limitations
+
+### 1. Direct IP Access (No SNI)
+
+Accessing HTTPS sites by IP (e.g., `https://192.168.1.1`) will fail with connection reset because:
+
+- Connections to IPs don't send **SNI** (Server Name Indication)
+- Transparent proxy cannot determine the original destination after NAT Port Forward
+- This is an architectural limitation of FreeBSD/pf - recovering the original destination requires divert sockets, which would require a complete rewrite
+
+**Workaround:**
+- **Option A (Recommended)**: Exclude specific IPs from NAT redirect
+  - Firewall > NAT > Port Forward
+  - Edit the rule that redirects port 443
+  - Destination: Invert match (NOT) → Single host → `192.168.1.1`
+  - This allows direct access to pfSense GUI and other local services
+- **Option B**: Access via hostname instead of IP (e.g., `https://pfsense.local` instead of `https://192.168.1.1`)
+- **Option C**: Change pfSense GUI to a different port (System > Advanced > TCP Port: 8443)
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed instructions.
+
+### 2. QUIC/HTTP3 Support
+
+Modern browsers (Chrome, Edge) attempt to use **QUIC** (HTTP/3 over UDP port 443). Since the proxy only handles TCP connections, QUIC traffic bypasses the proxy entirely.
+
+**Symptoms:**
+- Sites like Facebook, Google return `ERR_QUIC_PROTOCOL_ERROR`
+- Pages fail to load or load inconsistently
+
+**Workaround:**
+- Block UDP port 443 outbound in pfSense firewall
+- Firewall > Rules > LAN > Add
+- Action: Block, Protocol: UDP, Destination Port: 443
+- This forces browsers to fall back to TCP/TLS (HTTP/2 or HTTP/1.1)
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed instructions.
 
 ## License
 

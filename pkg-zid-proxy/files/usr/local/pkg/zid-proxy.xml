@@ -62,9 +62,15 @@
 		<field>
 			<fielddescr>Listen Interface</fielddescr>
 			<fieldname>interface</fieldname>
-			<type>interfaces_selection</type>
-			<hideinterfaceregex>loopback</hideinterfaceregex>
+			<type>select</type>
+			<default>all</default>
+			<options>
+				<option><name>All Interfaces (0.0.0.0) - Recommended for NAT</name><value>all</value></option>
+				<option><name>LAN</name><value>lan</value></option>
+				<option><name>WAN</name><value>wan</value></option>
+			</options>
 			<description><![CDATA[Select the interface where ZID Proxy will listen for connections.<br/>
+			<strong>Recommended:</strong> Use "All Interfaces" to ensure proper operation with NAT port forwarding.<br/>
 			<strong>Note:</strong> You will need to configure a firewall rule to redirect HTTPS traffic to this proxy.]]></description>
 		</field>
 		<field>

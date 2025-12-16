@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(cd:*)",
+      "Bash(make build-freebsd:*)",
+      "Bash(tar:*)",
+      "Bash(build/zid-proxy )",
+      "Bash(pkg-zid-proxy/ )",
+      "Bash(scripts/rc.d/zid-proxy:*)",
+      "Bash(configs/access_rules.txt )",
+      "Bash(README.md )",
+      "Bash(CLAUDE.md )",
+      "Bash(INSTALL-PFSENSE.md )"
+    ]
+  }
+}
