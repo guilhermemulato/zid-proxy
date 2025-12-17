@@ -107,6 +107,29 @@
 		</field>
 	</fields>
 
+	<adddeleteeditpagefields>
+		<columnitem>
+			<fielddescr>Enable</fielddescr>
+			<fieldname>enable</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Listen Interface</fielddescr>
+			<fieldname>interface</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Listen Port</fielddescr>
+			<fieldname>listen_port</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Logging</fielddescr>
+			<fieldname>enable_logging</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Timeout (s)</fielddescr>
+			<fieldname>timeout</fieldname>
+		</columnitem>
+	</adddeleteeditpagefields>
+
 	<custom_php_install_command>zidproxy_install();</custom_php_install_command>
 	<custom_php_deinstall_command>zidproxy_deinstall();</custom_php_deinstall_command>
 	<custom_php_resync_config_command>zidproxy_resync();</custom_php_resync_config_command>

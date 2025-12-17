@@ -166,16 +166,24 @@ func (rs *RuleSet) Match(srcIP net.IP, hostname string) (action RuleType, matche
 	defer rs.mu.RUnlock()
 
 	hostname = strings.ToLower(hostname)
+
+	var allowMatched bool
 	var blockMatched bool
 
+	// Collect ALL matching rules before deciding
 	for _, rule := range rs.rules {
 		if rs.matchRule(rule, srcIP, hostname) {
 			if rule.Type == RuleAllow {
-				// ALLOW takes priority - return immediately
-				return RuleAllow, true
+				allowMatched = true
+			} else {
+				blockMatched = true
 			}
-			blockMatched = true
 		}
+	}
+
+	// Priority: ALLOW > BLOCK
+	if allowMatched {
+		return RuleAllow, true
 	}
 
 	if blockMatched {

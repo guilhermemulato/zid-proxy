@@ -4,7 +4,10 @@
  * register-package.php
  *
  * Registers the ZID Proxy package in pfSense's config.xml.
- * This makes the package visible in the web interface.
+ * This makes the package visible in the web interface AND enables auto-start on boot.
+ *
+ * CRITICAL: This script adds BOTH the <package> and <menu> tags to config.xml.
+ * Without the <menu> tag, the menu won't appear AND the service won't auto-start after reboot.
  *
  * Usage: php register-package.php
  *
@@ -12,7 +15,7 @@
  */
 
 echo "=========================================\n";
-echo " ZID Proxy Package Registration\n";
+echo " ZID Proxy Package Registration v1.0.5\n";
 echo "=========================================\n\n";
 
 // Check if running as root
@@ -42,6 +45,9 @@ if (!is_array($config['installedpackages'])) {
 if (!is_array($config['installedpackages']['package'])) {
     $config['installedpackages']['package'] = array();
 }
+if (!is_array($config['installedpackages']['menu'])) {
+    $config['installedpackages']['menu'] = array();
+}
 if (!is_array($config['installedpackages']['zidproxy'])) {
     $config['installedpackages']['zidproxy'] = array();
 }
@@ -49,57 +55,74 @@ if (!is_array($config['installedpackages']['zidproxy']['config'])) {
     $config['installedpackages']['zidproxy']['config'] = array();
 }
 
-// Check if package is already registered
-$found = false;
+// Remove old package entries to avoid duplicates
+echo "Removing old package entries (if any)...\n";
 foreach ($config['installedpackages']['package'] as $idx => $pkg) {
     if (isset($pkg['name']) && $pkg['name'] == 'zid-proxy') {
-        $found = true;
-        echo "Package already registered (updating entry)...\n";
-        $config['installedpackages']['package'][$idx] = array(
-            'name' => 'zid-proxy',
-            'version' => '1.0.0',
-            'descr' => 'ZID Proxy - SNI-based transparent HTTPS filtering proxy',
-            'website' => '',
-            'pkg_includes' => '/usr/local/pkg/zid-proxy.inc',
-            'config_file' => '/usr/local/pkg/zid-proxy.xml'
-        );
-        break;
+        unset($config['installedpackages']['package'][$idx]);
+        echo "  - Removed old package entry\n";
     }
 }
+// Reindex array to avoid gaps
+$config['installedpackages']['package'] = array_values($config['installedpackages']['package']);
 
-if (!$found) {
-    echo "Registering new package...\n";
-    $config['installedpackages']['package'][] = array(
-        'name' => 'zid-proxy',
-        'version' => '1.0.0',
-        'descr' => 'ZID Proxy - SNI-based transparent HTTPS filtering proxy',
-        'website' => '',
-        'pkg_includes' => '/usr/local/pkg/zid-proxy.inc',
-        'config_file' => '/usr/local/pkg/zid-proxy.xml'
-    );
+// Add package entry with CORRECT tag names
+echo "Adding package entry...\n";
+$config['installedpackages']['package'][] = array(
+    'name' => 'zid-proxy',
+    'version' => '1.0.5',
+    'descr' => 'ZID Proxy - SNI-based transparent HTTPS filtering proxy',
+    'website' => '',
+    'configurationfile' => 'zid-proxy.xml',  // Correct tag (not config_file), no path
+    'include_file' => '/usr/local/pkg/zid-proxy.inc'
+);
+echo "  ✓ Package entry added\n";
+
+// Remove old menu entries to avoid duplicates
+echo "Removing old menu entries (if any)...\n";
+foreach ($config['installedpackages']['menu'] as $idx => $menu) {
+    if (isset($menu['name']) && $menu['name'] === 'ZID Proxy') {
+        unset($config['installedpackages']['menu'][$idx]);
+        echo "  - Removed old menu entry\n";
+    }
 }
+// Reindex array to avoid gaps
+$config['installedpackages']['menu'] = array_values($config['installedpackages']['menu']);
+
+// Add menu entry - THIS IS CRITICAL FOR BOTH MENU AND AUTO-START!
+echo "Adding menu entry to config.xml...\n";
+$config['installedpackages']['menu'][] = array(
+    'name' => 'ZID Proxy',
+    'tooltiptext' => 'Configure SNI-based transparent HTTPS proxy',
+    'section' => 'Services',
+    'url' => '/pkg.php?xml=zid-proxy.xml'
+);
+echo "  ✓ Menu entry added (this enables menu display AND boot auto-start)\n";
 
 // Initialize default configuration if empty
 if (empty($config['installedpackages']['zidproxy']['config'])) {
     echo "Creating default configuration...\n";
     $config['installedpackages']['zidproxy']['config'][0] = array(
         'enable' => 'off',
-        'interface' => 'lan',
+        'interface' => 'all',  // Changed from 'lan' to 'all' for better NAT compatibility
         'listen_port' => '3129',
         'timeout' => '30',
         'enable_logging' => 'on'
     );
+    echo "  ✓ Default config created (interface: all, port: 3129)\n";
 }
 
 // Write configuration
-echo "Writing configuration to config.xml...\n";
-write_config("ZID Proxy package registered");
+echo "Writing configuration to /cf/conf/config.xml...\n";
+write_config("ZID Proxy package registered v1.0.5");
+echo "  ✓ Configuration saved\n";
 
 // Load package functions and execute install hook
 if (file_exists('/usr/local/pkg/zid-proxy.inc')) {
     echo "Executing installation hook...\n";
     require_once('/usr/local/pkg/zid-proxy.inc');
     zidproxy_install();
+    echo "  ✓ Install hook executed\n";
 } else {
     echo "Warning: Package include file not found\n";
 }
@@ -108,20 +131,17 @@ echo "\n=========================================\n";
 echo " Registration Complete!\n";
 echo "=========================================\n\n";
 
-echo "The package has been registered in pfSense.\n\n";
+echo "✓ Package entry added to config.xml\n";
+echo "✓ Menu entry added to config.xml\n";
+echo "✓ Default configuration created\n\n";
 
-echo "To make the 'Services > ZID Proxy' menu appear, you need to reload\n";
-echo "the web interface. Choose one of these options:\n\n";
+echo "IMPORTANT: To see the menu in the web interface, reload the web GUI:\n\n";
+echo "  /etc/rc.restart_webgui\n\n";
+echo "  (Wait ~10 seconds for the GUI to reload)\n\n";
 
-echo "Option 1 - Reload webConfigurator:\n";
-echo "  /usr/local/sbin/pfSsh.php playback reloadwebgui\n\n";
+echo "Then reload your browser (Ctrl+Shift+R) and check Services > ZID Proxy\n\n";
 
-echo "Option 2 - Restart pfSense (safest):\n";
-echo "  shutdown -r now\n\n";
-
-echo "Option 3 - Restart PHP-FPM:\n";
-echo "  /usr/local/etc/rc.d/php-fpm restart\n\n";
-
-echo "After reloading, access Services > ZID Proxy in the web interface.\n\n";
+echo "The menu entry in config.xml also enables the service to auto-start\n";
+echo "after pfSense reboots (when Enable is checked in Settings tab).\n\n";
 
 ?>

@@ -1,15 +1,35 @@
 # Instalação Rápida - ZID Proxy no pfSense
 
-## 📦 Versão: 1.0.3
+## 📦 Versão: 1.0.8
 
-Este guia mostra como instalar o zid-proxy-pfsense-v1.0.3.tar.gz no pfSense.
+Este guia mostra como instalar o zid-proxy-pfsense-v1.0.8.tar.gz no pfSense.
 
-### 🆕 Novidades da v1.0.3
+### 🆕 Novidades da v1.0.8
 
-- ⭐ **Menu aparece automaticamente** - Sem necessidade de registro manual
-- 🔄 **GUI recarrega automaticamente** - Menu visível imediatamente após instalação
-- 📚 **Documentação completa de limitações** - Instruções claras para configurar NAT bypass
-- 🛠️ **Processo de instalação 100% automático** - Sem prompts interativos
+- 🔥 **CRITICAL BUG FIX** - BLOCK rules agora funcionam corretamente!
+- ✅ **Regras BLOCK Respeitadas** - Não mais ignoradas por ALLOW rules anteriores
+- 🎯 **Prioridade Correta** - ALLOW > BLOCK funciona como documentado
+- 🛠️ **Lógica Corrigida** - Match() verifica TODAS as regras antes de decidir
+
+### Novidades da v1.0.7
+
+- 📊 **Settings Table Display** - Aba Settings agora mostra tabela com configuração atual
+- ✅ **Visual Feedback** - Veja status (Enable, Interface, Port, Logging, Timeout) sem clicar em Edit
+- 🎨 **UX Melhorado** - Não mais tabela vazia com apenas ícones
+
+### Novidades da v1.0.6
+
+- 🚀 **Log em Tempo Real** - Logs aparecem em ≤1 segundo (não mais 3 minutos de atraso)
+- 🔧 **Flush Automático** - Logger faz flush a cada 1 segundo (ticker ativado)
+- ⚡ **Performance** - Overhead mínimo, compatível com pfSense 2.8.1/FreeBSD 15
+
+### Novidades da v1.0.5
+
+- 🎯 **GUI Reload Corrigido** - Usa `/etc/rc.restart_webgui` oficial (sem erro 502)
+- 📊 **Auto-Refresh Configurável** - Selecione: Disabled, 5s, 10s, 20s, 30s
+- ⏸️ **Pause Auto-Refresh** - Checkbox para pausar e analisar logs
+- 🔍 **Filtro em Tempo Real** - Busca instantânea por IP ou domínio
+- 💾 **Filtro Persistente** - Filtro mantém-se ativo durante auto-refresh
 
 ### ⚠️ Limitações Conhecidas
 
@@ -53,7 +73,7 @@ Veja [TROUBLESHOOTING.md](TROUBLESHOOTING.md) para detalhes.
 
 ```bash
 # Do seu computador
-scp zid-proxy-pfsense-v1.0.3.tar.gz root@SEU-PFSENSE-IP:/tmp/
+scp zid-proxy-pfsense-v1.0.8.tar.gz root@SEU-PFSENSE-IP:/tmp/
 ```
 
 ### Passo 2: Extrair e instalar
@@ -64,7 +84,7 @@ ssh root@SEU-PFSENSE-IP
 
 # Extrair o pacote
 cd /tmp
-tar -xzf zid-proxy-pfsense-v1.0.3.tar.gz
+tar -xzf zid-proxy-pfsense-v1.0.8.tar.gz
 cd zid-proxy-pfsense
 
 # Executar instalador
@@ -75,8 +95,9 @@ sh install.sh
 O instalador irá:
 1. ✓ Copiar todos os arquivos necessários
 2. ✓ Criar o script RC automaticamente
-3. ✓ Perguntar se deseja registrar no pfSense (responda "yes")
-4. ✓ Mostrar instruções para completar a instalação
+3. ✓ Registrar o pacote no pfSense (adiciona tags <package> e <menu>)
+4. ✓ Reiniciar PHP-FPM para carregar o menu
+5. ✓ Menu "Services > ZID Proxy" aparece automaticamente!
 
 ### Passo 3: Verificar instalação
 
@@ -91,12 +112,11 @@ tail -f /var/log/zid-proxy.log
 
 ### Passo 4: Acessar interface web
 
-1. Recarregue a interface web do pfSense:
-   ```bash
-   /usr/local/sbin/pfSsh.php playback reloadwebgui
-   ```
+1. Aguarde ~10 segundos para GUI recarregar
 
-2. Acesse: **Services > ZID Proxy**
+2. Recarregue seu navegador (Ctrl+Shift+R)
+
+3. Acesse: **Services > ZID Proxy** (deve aparecer automaticamente!)
 
 3. Configure:
    - ☑ Enable
@@ -126,8 +146,10 @@ php activate-package.php
 ```bash
 cd /tmp/zid-proxy-pfsense/pkg-zid-proxy
 php register-package.php
-/usr/local/sbin/pfSsh.php playback reloadwebgui
+/etc/rc.restart_webgui
 ```
+
+Aguarde ~10 segundos e recarregue o navegador (Ctrl+Shift+R).
 
 ### Diagnóstico completo
 
@@ -199,6 +221,41 @@ Se encontrar problemas:
 
 ## 📋 Changelog
 
+### v1.0.8 (2025-12-17)
+- 🔥 **CRITICAL BUG FIX**: BLOCK rules now work correctly
+- ✅ **Fixed rule matching logic**: No longer returns ALLOW immediately when first ALLOW rule matches
+- 🎯 **Priority fixed**: ALLOW > BLOCK now works as documented - checks ALL rules before deciding
+- 🛠️ **Core logic corrected**: `Match()` function rewritten to evaluate all matching rules
+- ✨ **All tests passing**: Unit tests confirm correct behavior restoration
+
+### v1.0.7 (2025-12-17)
+- 📊 **UX Improvement**: Settings tab displays configuration summary table with 5 columns
+- ✅ **Visibility**: Shows Enable, Interface, Port, Logging, and Timeout values at a glance
+- 🎨 **No More Empty Table**: Replaced icon-only display with informative configuration summary
+- 🛠️ **XML Update**: Added `<adddeleteeditpagefields>` section to package definition
+
+### v1.0.6 (2025-12-17)
+- 🚀 **Log Latency Fixed**: Reduced from 3 minutes to ≤1 second on pfSense 2.8.1/FreeBSD 15
+- 🔧 **Auto Flush**: Activated automatic log buffer flush every 1 second
+- ⚡ **Performance**: Minimal overhead (1 flush/second), huge UX improvement
+- 📝 **Technical**: Fixed buffered I/O issue where logs remained in 4KB buffer indefinitely
+
+### v1.0.5 (2025-12-17)
+- 🎯 **GUI Reload Corrigido**: Usa `/etc/rc.restart_webgui` oficial do pfSense (sem erro 502)
+- 📊 **Tela de Log Melhorada**: Auto-refresh configurável (5s, 10s, 20s, 30s, Disabled)
+- ⏸️ **Pause Auto-Refresh**: Checkbox para pausar e analisar logs detalhadamente
+- 🔍 **Filtro em Tempo Real**: Busca instantânea por IP ou domínio enquanto digita
+- 💾 **Filtro Persistente**: Mantém filtro ativo durante auto-refresh e reloads
+- 📝 **Backend + Frontend**: Filtro aplicado em PHP (otimização) e JavaScript (UX)
+
+### v1.0.4 (2025-12-17)
+- ✅ **Menu 100% funcional**: Tag `<menu>` agora adicionada corretamente ao config.xml
+- ✅ **Auto-start funciona**: Serviço inicia automaticamente após reboot do pfSense
+- 🔧 **Correção crítica**: register-package.php reescrito para adicionar menu ao config.xml
+- 📝 **Convenções corretas**: Usa `configurationfile` em vez de `config_file`
+- 🚀 **PHP-FPM correto**: install.sh usa `onerestart` em vez de `reloadwebgui`
+- 🎯 **Interface padrão**: Mudado de 'lan' para 'all' para melhor compatibilidade com NAT
+
 ### v1.0.3 (2025-12-16)
 - ⭐ **Menu automático**: Services > ZID Proxy aparece sem intervenção manual
 - 🔄 Install.sh registra pacote e recarrega GUI automaticamente
@@ -225,7 +282,7 @@ Se encontrar problemas:
 
 ---
 
-**Versão do Binário**: 1.0.3
-**Data de Build**: 2025-12-16
-**Compatível com**: pfSense 2.7.0+ (FreeBSD 15.x)
-**SHA256**: `3bba83f8758d0cc5ada06cfcac6410f7be155d4fa42d4b783db60aecdacdeb4e`
+**Versão do Binário**: 1.0.8
+**Data de Build**: 2025-12-17
+**Compatível com**: pfSense 2.7.0+ / 2.8.1 (FreeBSD 14.x / 15.x)
+**SHA256**: `<calculated after build>`

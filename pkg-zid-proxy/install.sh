@@ -129,16 +129,18 @@ if [ -f "${SCRIPT_DIR}/activate-package.php" ]; then
                 echo "[OK] Package registered successfully"
                 echo ""
 
-                # Reload pfSense GUI to make menu appear
-                echo "Reloading pfSense web interface..."
-                /usr/local/sbin/pfSsh.php playback reloadwebgui 2>/dev/null
+                # Reload pfSense web GUI to make menu appear
+                echo "Reloading pfSense web GUI..."
+                /etc/rc.restart_webgui 2>/dev/null &
                 reload_result=$?
 
                 if [ $reload_result -eq 0 ]; then
-                    echo "[OK] Web interface reloaded"
+                    echo "[OK] Web GUI reload initiated"
+                    echo ""
+                    echo "IMPORTANT: Wait ~10 seconds, then reload your browser (Ctrl+Shift+R) to see the new menu"
                 else
-                    echo "[WARNING] GUI reload may have failed"
-                    echo "          You may need to restart PHP-FPM or reboot pfSense"
+                    echo "[WARNING] Web GUI reload may have failed"
+                    echo "          Try manually: /etc/rc.restart_webgui"
                 fi
                 echo ""
             else

@@ -52,6 +52,10 @@ func main() {
 	}
 	defer accessLogger.Close()
 
+	// Start periodic log flush (every 1 second for near real-time logs)
+	flushDone := startFlushTicker(accessLogger, 1*time.Second)
+	defer close(flushDone)
+
 	// Load rules
 	ruleSet := rules.NewRuleSet(cfg.RulesFile)
 	if err := ruleSet.Load(); err != nil {
@@ -109,15 +113,17 @@ func removePidFile(path string) {
 }
 
 // startFlushTicker starts a goroutine that periodically flushes the logger
-func startFlushTicker(logger *logger.Logger) chan struct{} {
+func startFlushTicker(logger *logger.Logger, interval time.Duration) chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				logger.Flush()
+				if err := logger.Flush(); err != nil {
+					log.Printf("Warning: failed to flush log: %v", err)
+				}
 			case <-done:
 				return
 			}
