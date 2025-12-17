@@ -70,6 +70,9 @@ fi
 echo "Removing binary..."
 rm -f /usr/local/sbin/zid-proxy
 
+# Remove updater helper
+rm -f /usr/local/sbin/zid-proxy-update
+
 # Remove package files
 echo "Removing package files..."
 rm -f /usr/local/pkg/zid-proxy.xml

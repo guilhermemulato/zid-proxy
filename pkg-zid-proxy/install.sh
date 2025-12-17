@@ -58,11 +58,26 @@ cp ${FILES_DIR}/etc/inc/priv/zid-proxy.priv.inc /etc/inc/priv/
 echo "Installing package info..."
 cp ${FILES_DIR}${PREFIX}/share/pfSense-pkg-zid-proxy/info.xml ${PREFIX}/share/pfSense-pkg-zid-proxy/
 
+# Install updater helper (so future updates don't require manual tar/scp)
+if [ -f "${PKG_DIR}/update-bootstrap.sh" ]; then
+    echo "Installing updater helper..."
+    cp "${PKG_DIR}/update-bootstrap.sh" "${PREFIX}/sbin/zid-proxy-update"
+    chmod 755 "${PREFIX}/sbin/zid-proxy-update"
+    # Keep a copy alongside package info for reference
+    cp "${PKG_DIR}/update-bootstrap.sh" "${PREFIX}/share/pfSense-pkg-zid-proxy/zid-proxy-update"
+    chmod 755 "${PREFIX}/share/pfSense-pkg-zid-proxy/zid-proxy-update"
+fi
+
 # Check if binary exists in parent directory
 BINARY_PATH="${PKG_DIR}/../build/zid-proxy"
 if [ -f "${BINARY_PATH}" ]; then
     echo "Installing binary..."
-    cp ${BINARY_PATH} ${PREFIX}/sbin/zid-proxy
+    # Avoid "Text file busy" by never writing in-place to an executing binary.
+    # Copy to a temp file and atomically replace with mv.
+    TMP_BIN="${PREFIX}/sbin/.zid-proxy.new.$$"
+    cp "${BINARY_PATH}" "${TMP_BIN}"
+    chmod 755 "${TMP_BIN}"
+    mv -f "${TMP_BIN}" "${PREFIX}/sbin/zid-proxy"
     chmod 755 ${PREFIX}/sbin/zid-proxy
 else
     echo "Warning: Binary not found at ${BINARY_PATH}"
@@ -173,6 +188,7 @@ echo "  • Binary: ${PREFIX}/sbin/zid-proxy"
 echo "  • Package files: ${PREFIX}/pkg/zid-proxy.*"
 echo "  • Web interface: ${PREFIX}/www/zid-proxy_*.php"
 echo "  • RC script: ${PREFIX}/etc/rc.d/zid-proxy.sh"
+echo "  • Updater: ${PREFIX}/sbin/zid-proxy-update"
 echo ""
 echo "Next steps:"
 echo ""
@@ -194,4 +210,5 @@ echo "  • Run diagnostics: sh ${SCRIPT_DIR}/diagnose.sh"
 echo "  • View logs: tail -f /var/log/zid-proxy.log"
 echo "  • Manual activation: php ${SCRIPT_DIR}/activate-package.php"
 echo "  • Register package: php ${SCRIPT_DIR}/register-package.php"
+echo "  • Update (latest): ${PREFIX}/sbin/zid-proxy-update"
 echo ""

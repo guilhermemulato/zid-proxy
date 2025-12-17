@@ -99,6 +99,37 @@ O instalador irá:
 4. ✓ Reiniciar PHP-FPM para carregar o menu
 5. ✓ Menu "Services > ZID Proxy" aparece automaticamente!
 
+## 🔄 Atualização (Sem SCP / Sem Uninstall)
+
+Depois da primeira instalação, o `install.sh` instala um helper em:
+
+```bash
+/usr/local/sbin/zid-proxy-update
+```
+
+Para atualizar para a versão mais recente:
+
+```bash
+sh /usr/local/sbin/zid-proxy-update
+```
+
+Ele baixa `zid-proxy-pfsense-latest.tar.gz` do S3, descompacta em `/tmp` e reaplica o `install.sh` (sem `uninstall.sh`).
+As configurações do pfSense (config.xml) e o arquivo de regras (`/usr/local/etc/zid-proxy/access_rules.txt`) são mantidos.
+No final, ele reinicia o serviço se ele estava rodando antes do update.
+Se por algum motivo houver processos antigos (PID stale), o updater também finaliza instâncias restantes e sobe apenas uma.
+
+### Se travar em “Waiting for PIDS”
+
+Isso pode acontecer com helpers antigos que chamam o `rc.d ... stop` e ficam aguardando o daemon.
+Faça um update “manual” **uma única vez** para atualizar o helper:
+
+```bash
+fetch -o /tmp/zid-proxy-pfsense-latest.tar.gz https://s3.soulsolucoes.com.br/soul/portal/zid-proxy-pfsense-latest.tar.gz
+tar -xzf /tmp/zid-proxy-pfsense-latest.tar.gz -C /tmp
+sh /tmp/zid-proxy-pfsense/pkg-zid-proxy/install.sh
+sh /usr/local/sbin/zid-proxy-update
+```
+
 ### Passo 3: Verificar instalação
 
 ```bash

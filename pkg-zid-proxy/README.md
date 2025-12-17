@@ -23,6 +23,21 @@ Main installation script that:
 - Installs binary, web interface, and configuration files
 - Automatically runs activation and registration scripts
 - Provides interactive prompts for package registration
+- Installs an updater helper at `/usr/local/sbin/zid-proxy-update`
+
+### update.sh
+Updater script that:
+- Downloads the latest bundle from S3
+- Extracts to `/tmp` and reruns the bundled `install.sh`
+- Keeps pfSense settings (config.xml) and your rules file
+
+**Typical usage (after first install):**
+```bash
+sh /usr/local/sbin/zid-proxy-update
+```
+
+Note: `/usr/local/sbin/zid-proxy-update` is a small bootstrap wrapper that always runs the
+`pkg-zid-proxy/update.sh` from the latest bundle (so updater fixes don’t require reinstall).
 
 ### activate-package.php
 Activates the package by executing PHP installation hooks:
