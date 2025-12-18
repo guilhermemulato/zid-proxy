@@ -1,8 +1,8 @@
-.PHONY: all build build-freebsd clean test install
+.PHONY: all build build-freebsd clean test install bundle-latest
 
 BINARY=zid-proxy
 LOGROTATE_BINARY=zid-proxy-logrotate
-VERSION=1.0.10
+VERSION=1.0.10.1
 BUILD_DIR=build
 LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION)"
 
@@ -41,3 +41,7 @@ install: build-freebsd
 
 run:
 	$(GO) run ./cmd/zid-proxy -listen :8443 -rules configs/access_rules.txt -log /tmp/zid-proxy.log
+
+bundle-latest: build-freebsd
+	chmod +x scripts/bundle-latest.sh
+	./scripts/bundle-latest.sh

@@ -2,6 +2,12 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
+## [1.0.10.1] - 2025-12-18
+
+### Changed
+- Release repack: regenerated `zid-proxy-pfsense-latest.tar.gz` without functional changes
+- Updated `TODO-NOVAS-FUNCIONALIDADES.md` to mark implemented phases
+
 ## [1.0.10] - 2025-12-18
 
 ### Added

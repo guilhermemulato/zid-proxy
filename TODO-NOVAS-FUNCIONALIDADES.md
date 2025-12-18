@@ -25,29 +25,29 @@
 ## Plano de execucao (por fases)
 
 ### Fase 0 — Base de versao e integracoes
-- [ ] Confirmar formato do `zid-proxy -version` (compatível com o parse do updater atual)
-- [ ] Manter versao coerente entre: `Makefile`, `CHANGELOG.md`, `zid-proxy-pfsense-latest.version`
+- [x] Confirmar formato do `zid-proxy -version` (compatível com o parse do updater atual)
+- [x] Manter versao coerente entre: `Makefile`, `CHANGELOG.md`, `zid-proxy-pfsense-latest.version`
 - [ ] (Opcional) Persistir versao instalada em arquivo (fallback quando binario nao for executavel)
 
 ### Fase 1 — Binario Go de logrotate (`zid-proxy-logrotate`)
-- [ ] Criar `cmd/zid-proxy-logrotate/` (binario separado)
-- [ ] Criar `internal/logrotate/` com logica testavel (sem dependencias do pfSense)
-- [ ] Implementar rotacao diaria no padrao: `zid-proxy.log`, `zid-proxy.log.0`, `zid-proxy.log.1`, ...
-- [ ] Respeitar `keepDays` (default 7)
-- [ ] Criar flags: `-log`, `-keep-days` (e opcional: `-pidfile` / `-hup` se for sinalizar o daemon)
-- [ ] Adicionar testes unitarios (`*_test.go`) cobrindo os principais cenarios
+- [x] Criar `cmd/zid-proxy-logrotate/` (binario separado)
+- [x] Criar `internal/logrotate/` com logica testavel (sem dependencias do pfSense)
+- [x] Implementar rotacao diaria no padrao: `zid-proxy.log`, `zid-proxy.log.0`, `zid-proxy.log.1`, ...
+- [x] Respeitar `keepDays` (default 7)
+- [x] Criar flags: `-log`, `-keep-days` (e opcional: `-pidfile` / `-hup` se for sinalizar o daemon)
+- [x] Adicionar testes unitarios (`*_test.go`) cobrindo os principais cenarios
 
 ### Fase 2 — Reabrir log no binario principal (para rotacao funcionar)
-- [ ] Implementar `Reopen()` no logger (reabrir o arquivo de log com lock)
-- [ ] No `SIGHUP` do `zid-proxy`: recarregar regras e reabrir o log
-- [ ] Ajustar o `zid-proxy-logrotate` para sinalizar `SIGHUP` quando rotacionar (se aplicavel)
+- [x] Implementar `Reopen()` no logger (reabrir o arquivo de log com lock)
+- [x] No `SIGHUP` do `zid-proxy`: recarregar regras e reabrir o log
+- [x] Ajustar o `zid-proxy-logrotate` para sinalizar `SIGHUP` quando rotacionar (se aplicavel)
 
 ### Fase 3 — pfSense Web GUI (Settings)
-- [ ] Adicionar campo `log_retention_days` no `zid-proxy.xml` (default 7 + validacao)
-- [ ] Incluir defaults/validacao no `zid-proxy.inc`
-- [ ] Mostrar versao instalada na aba Settings (via `/usr/local/sbin/zid-proxy -version`)
-- [ ] Botao Update: executar `sh /usr/local/sbin/zid-proxy-update` e exibir somente `done` quando atualizar
-- [ ] Controles do servico: Start/Stop/Restart (via rc.d / service-utils)
+- [x] Adicionar campo `log_retention_days` no `zid-proxy.xml` (default 7 + validacao)
+- [x] Incluir defaults/validacao no `zid-proxy.inc`
+- [x] Mostrar versao instalada na aba Settings (via `/usr/local/sbin/zid-proxy -version`)
+- [x] Botao Update: executar `sh /usr/local/sbin/zid-proxy-update` e exibir somente `done` quando atualizar
+- [x] Controles do servico: Start/Stop/Restart (via rc.d / service-utils)
 
 ### Fase 4 — Cron do logrotate (1h/1h) usando `install_cron_job()` do `services.inc`
 - [ ] Usar sempre a funcao `install_cron_job()` do `services.inc` (nao editar crontab manualmente)
@@ -65,11 +65,9 @@
 - [ ] No `uninstall`: remover o cron do watchdog
 
 ### Fase 6 — Release (pacote `latest` para SCP/update)
-- [ ] Bump de versao (alteracao pequena: `1.0.9.1`, `1.0.9.2`, etc)
-- [ ] Registrar alteracoes no `CHANGELOG.md` criando nova versao
-- [ ] Rodar `make test`
-- [ ] Gerar binarios: `make build-freebsd`
-- [ ] Atualizar `zid-proxy-pfsense-latest.version`
-- [ ] Gerar `zid-proxy-pfsense-latest.tar.gz` (bundle com versao `latest`)
-
-
+- [x] Bump de versao (alteracao pequena: `1.0.9.1`, `1.0.9.2`, etc)
+- [x] Registrar alteracoes no `CHANGELOG.md` criando nova versao
+- [x] Rodar `make test`
+- [x] Gerar binarios: `make build-freebsd`
+- [x] Atualizar `zid-proxy-pfsense-latest.version`
+- [x] Gerar `zid-proxy-pfsense-latest.tar.gz` (bundle com versao `latest`)
