@@ -6,7 +6,7 @@
 		<descr><![CDATA[SNI-based transparent HTTPS proxy with IP/hostname dual-factor filtering.
 
 Intercepts TLS traffic and filters based on source IP address and destination hostname (extracted from SNI extension) without terminating TLS.]]></descr>
-		<version>1.0.0</version>
+		<version>1.0.8</version>
 		<pkginfolink>https://github.com/guilherme/zid-proxy</pkginfolink>
 		<config_file>/usr/local/pkg/zid-proxy.xml</config_file>
 		<configurationfile>zid-proxy.xml</configurationfile>

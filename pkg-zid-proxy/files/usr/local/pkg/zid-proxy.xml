@@ -16,13 +16,13 @@
 	<name>zidproxy</name>
 	<title>Services: ZID Proxy</title>
 	<include_file>/usr/local/pkg/zid-proxy.inc</include_file>
-	<aftersaveredirect>/pkg.php?xml=zid-proxy.xml</aftersaveredirect>
+	<aftersaveredirect>/zid-proxy_settings.php</aftersaveredirect>
 
 	<menu>
 		<name>ZID Proxy</name>
 		<tooltiptext>Configure SNI-based transparent HTTPS proxy</tooltiptext>
 		<section>Services</section>
-		<url>/pkg.php?xml=zid-proxy.xml</url>
+		<url>/zid-proxy_settings.php</url>
 	</menu>
 
 	<service>
@@ -35,7 +35,7 @@
 	<tabs>
 		<tab>
 			<text>Settings</text>
-			<url>/pkg.php?xml=zid-proxy.xml</url>
+			<url>/zid-proxy_settings.php</url>
 			<active/>
 		</tab>
 		<tab>
@@ -122,6 +122,14 @@
 			<default>30</default>
 			<description><![CDATA[Connection timeout in seconds. Default: 30]]></description>
 		</field>
+		<field>
+			<fielddescr>Log Retention Days</fielddescr>
+			<fieldname>log_retention_days</fieldname>
+			<type>input</type>
+			<size>6</size>
+			<default>7</default>
+			<description><![CDATA[How many days of daily rotated logs to keep. Default: 7]]></description>
+		</field>
 	</fields>
 
 	<adddeleteeditpagefields>
@@ -148,6 +156,10 @@
 		<columnitem>
 			<fielddescr>Timeout (s)</fielddescr>
 			<fieldname>timeout</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Log Retention (days)</fielddescr>
+			<fieldname>log_retention_days</fieldname>
 		</columnitem>
 	</adddeleteeditpagefields>
 

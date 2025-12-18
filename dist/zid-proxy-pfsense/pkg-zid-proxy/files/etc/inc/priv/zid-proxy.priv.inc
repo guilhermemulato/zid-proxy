@@ -15,7 +15,9 @@ $priv_list['page-services-zidproxy']['descr'] = "Allow access to ZID Proxy packa
 $priv_list['page-services-zidproxy']['match'] = array();
 $priv_list['page-services-zidproxy']['match'][] = "pkg.php?xml=zid-proxy.xml*";
 $priv_list['page-services-zidproxy']['match'][] = "pkg_edit.php?xml=zid-proxy.xml*";
+$priv_list['page-services-zidproxy']['match'][] = "zid-proxy_settings.php*";
 $priv_list['page-services-zidproxy']['match'][] = "zid-proxy_rules.php*";
+$priv_list['page-services-zidproxy']['match'][] = "zid-proxy_groups.php*";
 $priv_list['page-services-zidproxy']['match'][] = "zid-proxy_log.php*";
 
 ?>

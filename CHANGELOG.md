@@ -2,6 +2,17 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
+## [1.0.10] - 2025-12-18
+
+### Added
+- Daily log rotation support via new `zid-proxy-logrotate` binary
+- pfSense Settings field: log retention days (default 7)
+- pfSense Settings page: shows installed version, update button, and service controls
+
+### Changed
+- `cmd/zid-proxy/main.go` - SIGHUP now also reopens the log file (for log rotation)
+- `Makefile` - Builds `zid-proxy` and `zid-proxy-logrotate` (local + FreeBSD targets)
+
 ## [1.0.8] - 2025-12-17
 
 ### Fixed

@@ -16,13 +16,13 @@
 	<name>zidproxy</name>
 	<title>Services: ZID Proxy</title>
 	<include_file>/usr/local/pkg/zid-proxy.inc</include_file>
-	<aftersaveredirect>/pkg.php?xml=zid-proxy.xml</aftersaveredirect>
+	<aftersaveredirect>/zid-proxy_settings.php</aftersaveredirect>
 
 	<menu>
 		<name>ZID Proxy</name>
 		<tooltiptext>Configure SNI-based transparent HTTPS proxy</tooltiptext>
 		<section>Services</section>
-		<url>/pkg.php?xml=zid-proxy.xml</url>
+		<url>/zid-proxy_settings.php</url>
 	</menu>
 
 	<service>
@@ -35,8 +35,12 @@
 	<tabs>
 		<tab>
 			<text>Settings</text>
-			<url>/pkg.php?xml=zid-proxy.xml</url>
+			<url>/zid-proxy_settings.php</url>
 			<active/>
+		</tab>
+		<tab>
+			<text>Groups</text>
+			<url>/zid-proxy_groups.php</url>
 		</tab>
 		<tab>
 			<text>Access Rules</text>
@@ -62,9 +66,15 @@
 		<field>
 			<fielddescr>Listen Interface</fielddescr>
 			<fieldname>interface</fieldname>
-			<type>interfaces_selection</type>
-			<hideinterfaceregex>loopback</hideinterfaceregex>
+			<type>select</type>
+			<default>all</default>
+			<options>
+				<option><name>All Interfaces (0.0.0.0) - Recommended for NAT</name><value>all</value></option>
+				<option><name>LAN</name><value>lan</value></option>
+				<option><name>WAN</name><value>wan</value></option>
+			</options>
 			<description><![CDATA[Select the interface where ZID Proxy will listen for connections.<br/>
+			<strong>Recommended:</strong> Use "All Interfaces" to ensure proper operation with NAT port forwarding.<br/>
 			<strong>Note:</strong> You will need to configure a firewall rule to redirect HTTPS traffic to this proxy.]]></description>
 		</field>
 		<field>
@@ -92,6 +102,19 @@
 			<name>Advanced Settings</name>
 		</field>
 		<field>
+			<fielddescr>Rules Mode</fielddescr>
+			<fieldname>rules_mode</fieldname>
+			<type>select</type>
+			<default>legacy</default>
+			<options>
+				<option><name>Legacy (IP/CIDR + Hostname rules)</name><value>legacy</value></option>
+				<option><name>Groups (ordered groups + hostname rules)</name><value>groups</value></option>
+			</options>
+			<description><![CDATA[Select how rules are generated.<br/>
+			<strong>Legacy</strong>: Uses the Access Rules tab (pfSense GUI).<br/>
+			<strong>Groups</strong>: Uses the Groups tab. Order matters; first matching group wins.]]></description>
+		</field>
+		<field>
 			<fielddescr>Connection Timeout</fielddescr>
 			<fieldname>timeout</fieldname>
 			<type>input</type>
@@ -99,7 +122,46 @@
 			<default>30</default>
 			<description><![CDATA[Connection timeout in seconds. Default: 30]]></description>
 		</field>
+		<field>
+			<fielddescr>Log Retention Days</fielddescr>
+			<fieldname>log_retention_days</fieldname>
+			<type>input</type>
+			<size>6</size>
+			<default>7</default>
+			<description><![CDATA[How many days of daily rotated logs to keep. Default: 7]]></description>
+		</field>
 	</fields>
+
+	<adddeleteeditpagefields>
+		<columnitem>
+			<fielddescr>Enable</fielddescr>
+			<fieldname>enable</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Listen Interface</fielddescr>
+			<fieldname>interface</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Listen Port</fielddescr>
+			<fieldname>listen_port</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Logging</fielddescr>
+			<fieldname>enable_logging</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Rules Mode</fielddescr>
+			<fieldname>rules_mode</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Timeout (s)</fielddescr>
+			<fieldname>timeout</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Log Retention (days)</fielddescr>
+			<fieldname>log_retention_days</fieldname>
+		</columnitem>
+	</adddeleteeditpagefields>
 
 	<custom_php_install_command>zidproxy_install();</custom_php_install_command>
 	<custom_php_deinstall_command>zidproxy_deinstall();</custom_php_deinstall_command>

@@ -1,20 +1,35 @@
 .PHONY: all build build-freebsd clean test install
 
 BINARY=zid-proxy
-VERSION=1.0.9
+LOGROTATE_BINARY=zid-proxy-logrotate
+VERSION=1.0.10
 BUILD_DIR=build
 LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION)"
+
+# Go toolchain helper:
+# - On normal shells, uses `go`.
+# - Inside Flatpak (e.g. VSCode Flatpak), uses `flatpak-spawn --host go` so builds/tests
+#   run with the host toolchain.
+GO_CMD?=go
+GO?=$(GO_CMD)
+ifneq ($(FLATPAK_ID),)
+ifneq ($(shell command -v flatpak-spawn 2>/dev/null),)
+GO=flatpak-spawn --host $(GO_CMD)
+endif
+endif
 
 all: test build-freebsd
 
 build:
-	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/zid-proxy
+	$(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/zid-proxy
+	$(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(LOGROTATE_BINARY) ./cmd/zid-proxy-logrotate
 
 build-freebsd:
-	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/zid-proxy
+	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/zid-proxy
+	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(LOGROTATE_BINARY) ./cmd/zid-proxy-logrotate
 
 test:
-	go test -v ./...
+	$(GO) test -v ./...
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -25,4 +40,4 @@ install: build-freebsd
 	mkdir -p /usr/local/etc/zid-proxy
 
 run:
-	go run ./cmd/zid-proxy -listen :8443 -rules configs/access_rules.txt -log /tmp/zid-proxy.log
+	$(GO) run ./cmd/zid-proxy -listen :8443 -rules configs/access_rules.txt -log /tmp/zid-proxy.log

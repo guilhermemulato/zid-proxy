@@ -11,7 +11,7 @@ require_once("guiconfig.inc");
 require_once("/usr/local/pkg/zid-proxy.inc");
 
 $pgtitle = array(gettext("Services"), gettext("ZID Proxy"), gettext("Access Rules"));
-$pglinks = array("", "/pkg.php?xml=zid-proxy.xml", "@self");
+$pglinks = array("", "/zid-proxy_settings.php", "@self");
 $shortcut_section = "zidproxy";
 
 // Get rules from config
@@ -19,7 +19,7 @@ global $config;
 if (zidproxy_get_rules_mode() === 'groups') {
 	include("head.inc");
 	$tab_array = array();
-	$tab_array[] = array(gettext("Settings"), false, "/pkg.php?xml=zid-proxy.xml");
+	$tab_array[] = array(gettext("Settings"), false, "/zid-proxy_settings.php");
 	$tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 	$tab_array[] = array(gettext("Access Rules"), true, "/zid-proxy_rules.php");
 	$tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
@@ -110,7 +110,8 @@ include("head.inc");
 
 // Display tabs
 $tab_array = array();
-$tab_array[] = array(gettext("Settings"), false, "/pkg.php?xml=zid-proxy.xml");
+$tab_array[] = array(gettext("Settings"), false, "/zid-proxy_settings.php");
+$tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 $tab_array[] = array(gettext("Access Rules"), true, "/zid-proxy_rules.php");
 $tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
 display_top_tabs($tab_array);

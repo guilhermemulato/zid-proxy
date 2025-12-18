@@ -14,10 +14,100 @@ require_once("service-utils.inc");
 
 define('ZIDPROXY_BASE', '/usr/local/etc/zid-proxy');
 define('ZIDPROXY_RULES_FILE', ZIDPROXY_BASE . '/access_rules.txt');
+define('ZIDPROXY_GROUPS_FILE', ZIDPROXY_BASE . '/groups.json');
 define('ZIDPROXY_LOG_FILE', '/var/log/zid-proxy.log');
 define('ZIDPROXY_PID_FILE', '/var/run/zid-proxy.pid');
 define('ZIDPROXY_RCFILE', '/usr/local/etc/rc.d/zid-proxy.sh');
 define('ZIDPROXY_BINARY', '/usr/local/sbin/zid-proxy');
+
+function zidproxy_get_rules_mode() {
+	global $config;
+	$zidproxy_config = $config['installedpackages']['zidproxy']['config'][0] ?? [];
+	$mode = strtolower(trim($zidproxy_config['rules_mode'] ?? 'legacy'));
+	if ($mode !== 'groups' && $mode !== 'legacy') {
+		$mode = 'legacy';
+	}
+	return $mode;
+}
+
+function zidproxy_ensure_config_defaults() {
+	global $config;
+
+	if (!is_array($config['installedpackages']['zidproxy']['config'])) {
+		$config['installedpackages']['zidproxy']['config'] = array(array());
+	}
+	if (!is_array($config['installedpackages']['zidproxy']['config'][0] ?? null)) {
+		$config['installedpackages']['zidproxy']['config'][0] = array();
+	}
+
+	$changed = false;
+	$cfg = &$config['installedpackages']['zidproxy']['config'][0];
+
+	$defaults = [
+		'enable' => 'off',
+		'interface' => 'all',
+		'listen_port' => '3129',
+		'timeout' => '30',
+		'enable_logging' => 'on',
+		'rules_mode' => 'legacy',
+		'log_retention_days' => '7',
+	];
+
+	foreach ($defaults as $k => $v) {
+		if (!isset($cfg[$k]) || trim((string)$cfg[$k]) === '') {
+			$cfg[$k] = $v;
+			$changed = true;
+		}
+	}
+
+	// Normalize rules_mode if invalid
+	$mode = strtolower(trim((string)($cfg['rules_mode'] ?? 'legacy')));
+	if ($mode !== 'legacy' && $mode !== 'groups') {
+		$cfg['rules_mode'] = 'legacy';
+		$changed = true;
+	}
+
+	if ($changed) {
+		write_config("ZID Proxy settings normalized");
+	}
+}
+
+// Ensure defaults are present even before the first save, so pfSense "add/delete/edit"
+// summary tables show values for columns like listen_port, enable_logging, rules_mode.
+zidproxy_ensure_config_defaults();
+
+function zidproxy_get_groups() {
+	// Groups are stored in a local JSON file to avoid pfSense config.xml serialization/concurrency issues.
+	if (!file_exists(ZIDPROXY_GROUPS_FILE)) {
+		return [];
+	}
+	$raw = @file_get_contents(ZIDPROXY_GROUPS_FILE);
+	if ($raw === false || trim($raw) === '') {
+		return [];
+	}
+	$arr = json_decode($raw, true);
+	if (!is_array($arr)) {
+		return [];
+	}
+	return $arr;
+}
+
+function zidproxy_set_groups($groups) {
+	if (!is_array($groups)) {
+		$groups = [];
+	}
+	safe_mkdir(ZIDPROXY_BASE);
+	$json = json_encode($groups, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+	if ($json === false) {
+		$json = "[]\n";
+	} else {
+		$json .= "\n";
+	}
+	$tmp = ZIDPROXY_GROUPS_FILE . ".new";
+	file_put_contents($tmp, $json);
+	@chmod($tmp, 0600);
+	rename($tmp, ZIDPROXY_GROUPS_FILE);
+}
 
 /**
  * Install hook - called when package is installed
@@ -27,6 +117,34 @@ function zidproxy_install() {
 
 	// Create configuration directory
 	safe_mkdir(ZIDPROXY_BASE);
+
+	// Ensure package settings have defaults (so the Settings summary table is complete)
+	zidproxy_ensure_config_defaults();
+
+	// Create default groups file if it doesn't exist (fresh installs)
+	if (!file_exists(ZIDPROXY_GROUPS_FILE)) {
+		$default_groups = [
+			[
+				'name' => 'access_restricted',
+				'descr' => 'access_restricted',
+				'members' => '',
+				'rules' => ''
+			],
+			[
+				'name' => 'access_controlled',
+				'descr' => 'access_controlled',
+				'members' => '',
+				'rules' => ''
+			],
+			[
+				'name' => 'access_full',
+				'descr' => 'access_full',
+				'members' => '',
+				'rules' => ''
+			],
+		];
+		zidproxy_set_groups($default_groups);
+	}
 
 	// Create default rules file if it doesn't exist
 	if (!file_exists(ZIDPROXY_RULES_FILE)) {
@@ -83,6 +201,19 @@ function zidproxy_validate($post, &$input_errors) {
 			$input_errors[] = "Timeout must be a number between 1 and 300 seconds.";
 		}
 	}
+
+	if (!empty($post['log_retention_days'])) {
+		if (!is_numeric($post['log_retention_days']) || $post['log_retention_days'] < 1 || $post['log_retention_days'] > 365) {
+			$input_errors[] = "Log retention days must be a number between 1 and 365.";
+		}
+	}
+
+	if (!empty($post['rules_mode'])) {
+		$mode = strtolower(trim($post['rules_mode']));
+		if ($mode !== 'legacy' && $mode !== 'groups') {
+			$input_errors[] = "Rules mode must be legacy or groups.";
+		}
+	}
 }
 
 /**
@@ -91,6 +222,8 @@ function zidproxy_validate($post, &$input_errors) {
 function zidproxy_resync() {
 	global $config;
 
+	zidproxy_ensure_config_defaults();
+
 	$zidproxy_config = $config['installedpackages']['zidproxy']['config'][0] ?? [];
 
 	// Write rc.d script
@@ -98,18 +231,23 @@ function zidproxy_resync() {
 
 	if (isset($zidproxy_config['enable']) && $zidproxy_config['enable'] == 'on') {
 		// Get configuration values
-		$interface = $zidproxy_config['interface'] ?? 'lan';
+		$interface = $zidproxy_config['interface'] ?? 'all';
 		$port = $zidproxy_config['listen_port'] ?? '3129';
 		$timeout = $zidproxy_config['timeout'] ?? '30';
 		$enable_logging = isset($zidproxy_config['enable_logging']) && $zidproxy_config['enable_logging'] == 'on';
 
-		// Get interface IP
-		$if_ip = get_interface_ip($interface);
-		if (empty($if_ip)) {
-			$if_ip = '0.0.0.0';
+		// Determine listen address
+		if ($interface == 'all') {
+			// Listen on all interfaces (0.0.0.0) for NAT compatibility
+			$listen_addr = "0.0.0.0:{$port}";
+		} else {
+			// Listen on specific interface IP
+			$if_ip = get_interface_ip($interface);
+			if (empty($if_ip)) {
+				$if_ip = '0.0.0.0';
+			}
+			$listen_addr = "{$if_ip}:{$port}";
 		}
-
-		$listen_addr = "{$if_ip}:{$port}";
 
 		// Write rc.conf variables
 		set_rcvar('zid_proxy_enable', 'YES');
@@ -215,6 +353,18 @@ function zidproxy_get_rules() {
 function zidproxy_save_rules($rules) {
 	global $config;
 
+	// If user is using group mode, ignore legacy rules UI writes.
+	if (zidproxy_get_rules_mode() === 'groups') {
+		write_config("ZID Proxy rules ignored (groups mode)");
+		zidproxy_sync_rules();
+		if (zidproxy_status()) {
+			zidproxy_stop();
+			sleep(1);
+			zidproxy_start();
+		}
+		return;
+	}
+
 	$config['installedpackages']['zidproxyrules']['config'] = [];
 	foreach ($rules as $rule) {
 		$config['installedpackages']['zidproxyrules']['config'][] = [
@@ -227,13 +377,25 @@ function zidproxy_save_rules($rules) {
 
 	write_config("ZID Proxy rules updated");
 	zidproxy_sync_rules();
-	zidproxy_reload();
+
+	// Ensure rules are reloaded by restarting the service
+	// This is more reliable than SIGHUP in some cases
+	if (zidproxy_status()) {
+		zidproxy_stop();
+		sleep(1);
+		zidproxy_start();
+	}
 }
 
 /**
  * Sync rules from pfSense config to rules file
  */
 function zidproxy_sync_rules() {
+	if (zidproxy_get_rules_mode() === 'groups') {
+		zidproxy_sync_group_rules();
+		return;
+	}
+
 	$rules = zidproxy_get_rules();
 
 	$content = "# ZID Proxy Access Rules\n";
@@ -249,6 +411,78 @@ function zidproxy_sync_rules() {
 			}
 			$content .= "\n";
 		}
+	}
+
+	file_put_contents(ZIDPROXY_RULES_FILE, $content);
+}
+
+function zidproxy_sync_group_rules() {
+	$groups = zidproxy_get_groups();
+
+	$content = "# ZID Proxy Access Rules (GROUPS)\n";
+	$content .= "# Order matters: first matching group wins\n";
+	$content .= "# Auto-generated by pfSense - " . date('Y-m-d H:i:s') . "\n\n";
+
+	foreach ($groups as $g) {
+		$name = trim((string)($g['name'] ?? ''));
+		if ($name === '') {
+			continue;
+		}
+		$content .= "GROUP;{$name}\n";
+
+		// Members and rules are stored as plain multi-line strings in config.xml
+		$members_text = (string)($g['members'] ?? '');
+		$members_lines = preg_split("/\\r\\n|\\n|\\r/", $members_text);
+		foreach ($members_lines as $line) {
+			$line = trim((string)$line);
+			if ($line === '' || strpos($line, '#') === 0) {
+				continue;
+			}
+			$hash = strpos($line, '#');
+			if ($hash !== false) {
+				$line = trim(substr($line, 0, $hash));
+				if ($line === '') {
+					continue;
+				}
+			}
+			$content .= "MEMBER;{$line}\n";
+		}
+
+		$rules_text = (string)($g['rules'] ?? '');
+		$rules_lines = preg_split("/\\r\\n|\\n|\\r/", $rules_text);
+		foreach ($rules_lines as $line) {
+			$line = trim((string)$line);
+			if ($line === '' || strpos($line, '#') === 0) {
+				continue;
+			}
+
+			$comment = '';
+			$hash = strpos($line, '#');
+			if ($hash !== false) {
+				$comment = trim(substr($line, $hash + 1));
+				$line = trim(substr($line, 0, $hash));
+				if ($line === '') {
+					continue;
+				}
+			}
+
+			$parts = array_map('trim', explode(';', $line));
+			if (count($parts) !== 2) {
+				continue;
+			}
+			$type = strtoupper($parts[0]);
+			$hostname = strtolower($parts[1]);
+			if ($hostname === '' || ($type !== 'ALLOW' && $type !== 'BLOCK')) {
+				continue;
+			}
+			$content .= "{$type};{$hostname}";
+			if ($comment !== '') {
+				$content .= " # {$comment}";
+			}
+			$content .= "\n";
+		}
+
+		$content .= "\n";
 	}
 
 	file_put_contents(ZIDPROXY_RULES_FILE, $content);
@@ -298,13 +532,24 @@ function zidproxy_get_log_entries($lines = 200) {
 			continue;
 		}
 
-		// Parse: TIMESTAMP | SOURCE_IP | HOSTNAME | ACTION
+		// Parse:
+		// - New: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION
+		// - Old: TIMESTAMP | SOURCE_IP | HOSTNAME | ACTION
 		$parts = array_map('trim', explode('|', $line));
-		if (count($parts) >= 4) {
+		if (count($parts) >= 5) {
 			$entries[] = [
 				'timestamp' => $parts[0],
 				'source_ip' => $parts[1],
 				'hostname' => $parts[2],
+				'group' => $parts[3],
+				'action' => $parts[4]
+			];
+		} elseif (count($parts) >= 4) {
+			$entries[] = [
+				'timestamp' => $parts[0],
+				'source_ip' => $parts[1],
+				'hostname' => $parts[2],
+				'group' => '',
 				'action' => $parts[3]
 			];
 		}

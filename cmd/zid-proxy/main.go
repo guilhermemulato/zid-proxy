@@ -88,6 +88,9 @@ func main() {
 			if err := server.Reload(); err != nil {
 				log.Printf("Failed to reload rules: %v", err)
 			}
+			if err := accessLogger.Reopen(); err != nil {
+				log.Printf("Failed to reopen log file: %v", err)
+			}
 		case syscall.SIGTERM, syscall.SIGINT:
 			log.Printf("Received %s, shutting down...", sig)
 			if err := server.Stop(); err != nil {

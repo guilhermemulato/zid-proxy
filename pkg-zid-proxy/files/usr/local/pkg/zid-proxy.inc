@@ -50,6 +50,7 @@ function zidproxy_ensure_config_defaults() {
 		'timeout' => '30',
 		'enable_logging' => 'on',
 		'rules_mode' => 'legacy',
+		'log_retention_days' => '7',
 	];
 
 	foreach ($defaults as $k => $v) {
@@ -198,6 +199,12 @@ function zidproxy_validate($post, &$input_errors) {
 	if (!empty($post['timeout'])) {
 		if (!is_numeric($post['timeout']) || $post['timeout'] < 1 || $post['timeout'] > 300) {
 			$input_errors[] = "Timeout must be a number between 1 and 300 seconds.";
+		}
+	}
+
+	if (!empty($post['log_retention_days'])) {
+		if (!is_numeric($post['log_retention_days']) || $post['log_retention_days'] < 1 || $post['log_retention_days'] > 365) {
+			$input_errors[] = "Log retention days must be a number between 1 and 365.";
 		}
 	}
 

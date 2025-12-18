@@ -1,1 +1,2 @@
 15527862910af3fc944c9eefedc64d36557beb58df85a73f2db616c04ccc7333  zid-proxy-pfsense-v1.0.5.tar.gz
+6fd3e97c613ad406d547ac7fceaf07adfbf8ee6aecd16f45efb2278c94338c9b  zid-proxy-pfsense-latest.tar.gz
