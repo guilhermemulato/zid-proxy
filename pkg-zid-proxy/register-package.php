@@ -70,7 +70,7 @@ $config['installedpackages']['package'] = array_values($config['installedpackage
 echo "Adding package entry...\n";
 $config['installedpackages']['package'][] = array(
     'name' => 'zid-proxy',
-    'version' => '1.0.5',
+    'version' => '1.0.10.5',
     'descr' => 'ZID Proxy - SNI-based transparent HTTPS filtering proxy',
     'website' => '',
     'configurationfile' => 'zid-proxy.xml',  // Correct tag (not config_file), no path
@@ -95,7 +95,7 @@ $config['installedpackages']['menu'][] = array(
     'name' => 'ZID Proxy',
     'tooltiptext' => 'Configure SNI-based transparent HTTPS proxy',
     'section' => 'Services',
-    'url' => '/pkg.php?xml=zid-proxy.xml'
+    'url' => '/zid-proxy_settings.php'
 );
 echo "  ✓ Menu entry added (this enables menu display AND boot auto-start)\n";
 
@@ -108,14 +108,15 @@ if (empty($config['installedpackages']['zidproxy']['config'])) {
         'listen_port' => '3129',
         'timeout' => '30',
         'enable_logging' => 'on',
-        'rules_mode' => 'legacy'
+        'rules_mode' => 'legacy',
+        'log_retention_days' => '7'
     );
     echo "  ✓ Default config created (interface: all, port: 3129)\n";
 }
 
 // Write configuration
 echo "Writing configuration to /cf/conf/config.xml...\n";
-write_config("ZID Proxy package registered v1.0.5");
+write_config("ZID Proxy package registered");
 echo "  ✓ Configuration saved\n";
 
 // Load package functions and execute install hook

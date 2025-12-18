@@ -2,6 +2,27 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
+## [1.0.10.5] - 2025-12-18
+
+### Fixed
+- Cron install: improved compatibility/verification (ensures cron is actually persisted and applied via `configure_cron()`)
+
+## [1.0.10.4] - 2025-12-18
+
+### Added
+- Hourly logrotate cron via `install_cron_job()` (keeps daily rotated logs based on `log_retention_days`)
+
+## [1.0.10.3] - 2025-12-18
+
+### Fixed
+- pfSense Settings: prevent wiping existing config on save (merge config + save marker)
+- pfSense Menu entry now points to `/zid-proxy_settings.php` (instead of `/pkg.php?xml=zid-proxy.xml`)
+
+## [1.0.10.2] - 2025-12-18
+
+### Fixed
+- pfSense Settings: removed duplicate Save button and added a bit more padding to Service Controls buttons row
+
 ## [1.0.10.1] - 2025-12-18
 
 ### Changed

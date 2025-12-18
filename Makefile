@@ -2,7 +2,7 @@
 
 BINARY=zid-proxy
 LOGROTATE_BINARY=zid-proxy-logrotate
-VERSION=1.0.10.1
+VERSION=1.0.10.5
 BUILD_DIR=build
 LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION)"
 

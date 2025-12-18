@@ -11,6 +11,8 @@ require_once("config.inc");
 require_once("functions.inc");
 require_once("util.inc");
 require_once("service-utils.inc");
+require_once("services.inc");
+@require_once("cron.inc");
 
 define('ZIDPROXY_BASE', '/usr/local/etc/zid-proxy');
 define('ZIDPROXY_RULES_FILE', ZIDPROXY_BASE . '/access_rules.txt');
@@ -19,6 +21,223 @@ define('ZIDPROXY_LOG_FILE', '/var/log/zid-proxy.log');
 define('ZIDPROXY_PID_FILE', '/var/run/zid-proxy.pid');
 define('ZIDPROXY_RCFILE', '/usr/local/etc/rc.d/zid-proxy.sh');
 define('ZIDPROXY_BINARY', '/usr/local/sbin/zid-proxy');
+define('ZIDPROXY_LOGROTATE_BINARY', '/usr/local/sbin/zid-proxy-logrotate');
+define('ZIDPROXY_LOGROTATE_CRON_DESCR', 'ZID Proxy: logrotate');
+
+function zidproxy_logrotate_cron_command($keep_days) {
+	$keep = is_numeric($keep_days) ? (int)$keep_days : 7;
+	if ($keep < 1) {
+		$keep = 1;
+	}
+	return sprintf(
+		'%s -log %s -keep-days %d -pid %s -hup >/dev/null 2>&1',
+		escapeshellcmd(ZIDPROXY_LOGROTATE_BINARY),
+		escapeshellarg(ZIDPROXY_LOG_FILE),
+		$keep,
+		escapeshellarg(ZIDPROXY_PID_FILE)
+	);
+}
+
+function zidproxy_configure_cron_compat() {
+	if (function_exists('configure_cron')) {
+		@configure_cron();
+	}
+}
+
+function zidproxy_cron_job_present($id_or_descr, $command = null) {
+	global $config;
+	if (!is_array($config)) {
+		return false;
+	}
+
+	// pfSense has used different keys across versions/packages.
+	$lists = [];
+	if (isset($config['cron']['item']) && is_array($config['cron']['item'])) {
+		$lists[] = $config['cron']['item'];
+	}
+	if (isset($config['cron']['job']) && is_array($config['cron']['job'])) {
+		$lists[] = $config['cron']['job'];
+	}
+
+	foreach ($lists as $jobs) {
+		foreach ($jobs as $job) {
+			if (!is_array($job)) {
+				continue;
+			}
+			$job_id = (string)($job['id'] ?? $job['ident'] ?? $job['identifier'] ?? '');
+			$job_descr = (string)($job['descr'] ?? '');
+			$job_cmd = (string)($job['command'] ?? '');
+
+			if ($job_id !== '' && $job_id === $id_or_descr) {
+				return true;
+			}
+			if ($job_descr !== '' && ($job_descr === $id_or_descr || $job_descr === ZIDPROXY_LOGROTATE_CRON_DESCR)) {
+				return true;
+			}
+			if ($command !== null && $job_cmd !== '' && $job_cmd === $command) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+function zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command) {
+	global $config;
+	if (!is_array($config)) {
+		return false;
+	}
+
+	$targets = [];
+	if (isset($config['cron']['item']) && is_array($config['cron']['item'])) {
+		$targets[] = 'item';
+	}
+	if (isset($config['cron']['job']) && is_array($config['cron']['job'])) {
+		$targets[] = 'job';
+	}
+	if (empty($targets)) {
+		$config['cron'] = is_array($config['cron'] ?? null) ? $config['cron'] : [];
+		$config['cron']['item'] = [];
+		$targets[] = 'item';
+	}
+
+	foreach ($targets as $key) {
+		foreach ($config['cron'][$key] as $idx => $job) {
+			if (!is_array($job)) {
+				continue;
+			}
+			if (($job['descr'] ?? '') === $descr) {
+				$config['cron'][$key][$idx]['minute'] = $minute;
+				$config['cron'][$key][$idx]['hour'] = $hour;
+				$config['cron'][$key][$idx]['mday'] = $mday;
+				$config['cron'][$key][$idx]['month'] = $month;
+				$config['cron'][$key][$idx]['wday'] = $wday;
+				$config['cron'][$key][$idx]['who'] = $who;
+				$config['cron'][$key][$idx]['command'] = $command;
+				$config['cron'][$key][$idx]['enabled'] = 'true';
+				zidproxy_configure_cron_compat();
+				@write_config("ZID Proxy cron updated");
+				return true;
+			}
+		}
+	}
+
+	// Not found; create new entry (pfSense typically uses cron[item]).
+	$config['cron'][$targets[0]][] = [
+		'minute' => $minute,
+		'hour' => $hour,
+		'mday' => $mday,
+		'month' => $month,
+		'wday' => $wday,
+		'who' => $who,
+		'command' => $command,
+		'descr' => $descr,
+		'enabled' => 'true',
+	];
+	zidproxy_configure_cron_compat();
+	@write_config("ZID Proxy cron installed");
+	return true;
+}
+
+function zidproxy_install_cron_job_compat($minute, $hour, $mday, $month, $wday, $who, $command, $descr) {
+	if (!function_exists('install_cron_job')) {
+		// Fallback to a safe config upsert.
+		return zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command);
+	}
+
+	// pfSense has shipped multiple install_cron_job() signatures historically.
+	// Try known argument orderings safely.
+	$attempts = [];
+	// Common on pfSense: install_cron_job($command, $minute, $hour, $mday, $month, $wday, $who, $descr)
+	$attempts[] = [$command, $minute, $hour, $mday, $month, $wday, $who, $descr];
+	$attempts[] = [$command, $minute, $hour, $mday, $month, $wday, $who];
+	// Some variants accept ($descr,$command,...)
+	$attempts[] = [$descr, $command, $minute, $hour, $mday, $month, $wday, $who];
+	$attempts[] = [$descr, $command, $minute, $hour, $mday, $month, $wday, $who, $descr];
+
+	foreach ($attempts as $args) {
+		// install_cron_job may emit warnings on signature mismatch; do best-effort suppress.
+		@call_user_func_array('install_cron_job', $args);
+		if (zidproxy_cron_job_present($descr, $command)) {
+			zidproxy_configure_cron_compat();
+			@write_config("ZID Proxy cron updated");
+			return true;
+		}
+	}
+
+	// If install_cron_job() didn't take, ensure it's present by updating config directly.
+	return zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command);
+}
+
+function zidproxy_remove_cron_job_compat($id, $command = null) {
+	if (function_exists('remove_cron_job')) {
+		try {
+			remove_cron_job($id);
+			return true;
+		} catch (Throwable $e) {}
+	}
+	if (function_exists('uninstall_cron_job')) {
+		try {
+			uninstall_cron_job($id);
+			return true;
+		} catch (Throwable $e) {}
+	}
+	if (function_exists('delete_cron_job')) {
+		try {
+			delete_cron_job($id);
+			return true;
+		} catch (Throwable $e) {}
+	}
+
+	// Some variants require both id and command
+	if ($command !== null && function_exists('uninstall_cron_job')) {
+		try {
+			uninstall_cron_job($id, $command);
+			return true;
+		} catch (Throwable $e) {}
+	}
+	if ($command !== null && function_exists('remove_cron_job')) {
+		try {
+			remove_cron_job($id, $command);
+			zidproxy_configure_cron_compat();
+			@write_config("ZID Proxy cron removed");
+			return true;
+		} catch (Throwable $e) {}
+	}
+
+	return false;
+}
+
+function zidproxy_install_logrotate_cron() {
+	global $config;
+	$zidproxy_config = $config['installedpackages']['zidproxy']['config'][0] ?? [];
+	$keep_days = $zidproxy_config['log_retention_days'] ?? '7';
+
+	// Install only when helper binary exists.
+	if (!file_exists(ZIDPROXY_LOGROTATE_BINARY)) {
+		// Best-effort remove an existing cron if the binary is missing.
+		zidproxy_remove_logrotate_cron();
+		return false;
+	}
+
+	$cmd = zidproxy_logrotate_cron_command($keep_days);
+	return zidproxy_install_cron_job_compat(
+		'0',  // minute
+		'*',  // hour
+		'*',  // mday
+		'*',  // month
+		'*',  // wday
+		'root',
+		$cmd,
+		ZIDPROXY_LOGROTATE_CRON_DESCR
+	);
+}
+
+function zidproxy_remove_logrotate_cron() {
+	$cmd = zidproxy_logrotate_cron_command(7);
+	return zidproxy_remove_cron_job_compat(ZIDPROXY_LOGROTATE_CRON_DESCR, $cmd);
+}
 
 function zidproxy_get_rules_mode() {
 	global $config;
@@ -166,6 +385,9 @@ RULES;
 	touch(ZIDPROXY_LOG_FILE);
 	chmod(ZIDPROXY_LOG_FILE, 0644);
 
+	// Install/update hourly logrotate cron (idempotent)
+	zidproxy_install_logrotate_cron();
+
 	// Sync configuration
 	zidproxy_resync();
 
@@ -178,6 +400,9 @@ RULES;
 function zidproxy_deinstall() {
 	// Stop the service
 	zidproxy_stop();
+
+	// Remove logrotate cron
+	zidproxy_remove_logrotate_cron();
 
 	// Remove rc.conf entries
 	unset_rcvar('zid_proxy_enable');
@@ -228,6 +453,9 @@ function zidproxy_resync() {
 
 	// Write rc.d script
 	zidproxy_write_rcfile();
+
+	// Ensure hourly logrotate cron exists (idempotent) and reflects current retention settings.
+	zidproxy_install_logrotate_cron();
 
 	if (isset($zidproxy_config['enable']) && $zidproxy_config['enable'] == 'on') {
 		// Get configuration values

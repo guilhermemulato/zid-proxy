@@ -50,11 +50,11 @@
 - [x] Controles do servico: Start/Stop/Restart (via rc.d / service-utils)
 
 ### Fase 4 — Cron do logrotate (1h/1h) usando `install_cron_job()` do `services.inc`
-- [ ] Usar sempre a funcao `install_cron_job()` do `services.inc` (nao editar crontab manualmente)
-- [ ] Instalar/atualizar cron do logrotate no `install` do pacote (idempotente)
-- [ ] Remover cron do logrotate no `uninstall` do pacote
-- [ ] Agendamento: minuto `0`, hora `*` (1h em 1h), usuario `root`
-- [ ] Comando final do cron chama o `zid-proxy-logrotate` com os parametros corretos
+- [x] Usar sempre a funcao `install_cron_job()` do `services.inc` (nao editar crontab manualmente)
+- [x] Instalar/atualizar cron do logrotate no `install` do pacote (idempotente)
+- [x] Remover cron do logrotate no `uninstall` do pacote
+- [x] Agendamento: minuto `0`, hora `*` (1h em 1h), usuario `root`
+- [x] Comando final do cron chama o `zid-proxy-logrotate` com os parametros corretos
 
 ### Fase 5 — Watchdog (cron + logica “so inicia se Enable=on”)
 - [ ] Implementar watchdog (script/PHP) que verifica `Enable` e o status do processo

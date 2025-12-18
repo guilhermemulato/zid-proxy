@@ -82,27 +82,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		} else {
 			$update_msg = $joined !== '' ? $joined : sprintf(gettext("Update failed (exit %d)."), $rc);
 		}
-	} elseif (isset($_POST['save_settings'])) {
+	} elseif (isset($_POST['save']) && isset($_POST['zidproxy_settings_form']) && $_POST['zidproxy_settings_form'] === '1') {
 		$post = $_POST;
 		$input_errors = [];
 
 		zidproxy_validate($post, $input_errors);
-
-		// Normalize values
-		$new = [];
-		$new['enable'] = isset($post['enable']) && $post['enable'] === 'on' ? 'on' : 'off';
-		$new['interface'] = $post['interface'] ?? 'all';
-		$new['listen_port'] = trim((string)($post['listen_port'] ?? '3129'));
-		$new['enable_logging'] = isset($post['enable_logging']) && $post['enable_logging'] === 'on' ? 'on' : 'off';
-		$new['rules_mode'] = strtolower(trim((string)($post['rules_mode'] ?? 'legacy')));
-		$new['timeout'] = trim((string)($post['timeout'] ?? '30'));
-		$new['log_retention_days'] = trim((string)($post['log_retention_days'] ?? '7'));
 
 		if (empty($input_errors)) {
 			config_lock();
 			if (!is_array($config['installedpackages']['zidproxy']['config'])) {
 				$config['installedpackages']['zidproxy']['config'] = array(array());
 			}
+			if (!is_array($config['installedpackages']['zidproxy']['config'][0] ?? null)) {
+				$config['installedpackages']['zidproxy']['config'][0] = array();
+			}
+
+			$existing = $config['installedpackages']['zidproxy']['config'][0];
+			if (!is_array($existing)) {
+				$existing = [];
+			}
+
+			// Merge: never wipe fields if some inputs are missing due to UI/form quirks.
+			$new = $existing;
+
+			// Checkboxes: absence means "off" only for this settings form.
+			$new['enable'] = isset($post['enable']) ? 'on' : 'off';
+			$new['enable_logging'] = isset($post['enable_logging']) ? 'on' : 'off';
+
+			// Other fields: only override when present (avoid resetting to defaults unexpectedly).
+			if (isset($post['interface']) && trim((string)$post['interface']) !== '') {
+				$new['interface'] = trim((string)$post['interface']);
+			}
+			if (isset($post['listen_port']) && trim((string)$post['listen_port']) !== '') {
+				$new['listen_port'] = trim((string)$post['listen_port']);
+			}
+			if (isset($post['rules_mode']) && trim((string)$post['rules_mode']) !== '') {
+				$new['rules_mode'] = strtolower(trim((string)$post['rules_mode']));
+			}
+			if (isset($post['timeout']) && trim((string)$post['timeout']) !== '') {
+				$new['timeout'] = trim((string)$post['timeout']);
+			}
+			if (isset($post['log_retention_days']) && trim((string)$post['log_retention_days']) !== '') {
+				$new['log_retention_days'] = trim((string)$post['log_retention_days']);
+			}
+
 			$config['installedpackages']['zidproxy']['config'][0] = $new;
 			write_config("ZID Proxy settings updated");
 			config_unlock();
@@ -136,6 +159,15 @@ $tab_array[] = array(gettext("Access Rules"), false, "/zid-proxy_rules.php");
 $tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
 display_top_tabs($tab_array);
 
+?>
+<style>
+	#zidproxy-service-controls .panel-body {
+		padding-left: 20px;
+		padding-right: 20px;
+	}
+</style>
+<?php
+
 if (!empty($input_errors)) {
 	print_input_errors($input_errors);
 }
@@ -154,7 +186,7 @@ if (!empty($update_msg)) {
 	</div>
 </div>
 
-<div class="panel panel-default">
+<div class="panel panel-default" id="zidproxy-service-controls">
 	<div class="panel-heading"><h2 class="panel-title"><?=gettext('Service Controls')?></h2></div>
 	<div class="panel-body">
 		<form method="post">
@@ -187,6 +219,15 @@ if (!empty($update_msg)) {
 // Settings form
 $form = new Form();
 $form->setAction('zid-proxy_settings.php');
+
+// Marker so we only treat POSTs from this settings form as config saves.
+$form->addGlobal(new Form_Input(
+	'zidproxy_settings_form',
+	'',
+	'hidden',
+	'1'
+));
+
 $section = new Form_Section('General Settings');
 
 $section->addInput(new Form_Checkbox(
@@ -253,13 +294,6 @@ $section2->addInput(new Form_Input(
 
 $form->add($section);
 $form->add($section2);
-
-$form->addGlobal(new Form_Button(
-	'save_settings',
-	gettext('Save'),
-	null,
-	'fa-save'
-))->addClass('btn-primary');
 
 print($form);
 ?>
