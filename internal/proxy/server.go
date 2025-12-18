@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/guilherme/zid-proxy/internal/activeips"
 	"github.com/guilherme/zid-proxy/internal/logger"
 	"github.com/guilherme/zid-proxy/internal/rules"
 )
@@ -17,6 +18,7 @@ type Config struct {
 	ListenAddr   string
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
+	ActiveIPs    *activeips.Tracker
 }
 
 // DefaultConfig returns a Config with sensible defaults
@@ -25,6 +27,7 @@ func DefaultConfig() Config {
 		ListenAddr:   ":443",
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
+		ActiveIPs:    nil,
 	}
 }
 
@@ -133,6 +136,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		clientConn:   conn,
 		readTimeout:  s.config.ReadTimeout,
 		writeTimeout: s.config.WriteTimeout,
+		activeIPs:    s.config.ActiveIPs,
 	}
 
 	handler.Handle()

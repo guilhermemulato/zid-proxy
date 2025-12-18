@@ -2,6 +2,21 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
+## [1.0.11] - 2025-12-18
+
+### Added
+- Active IPs tracking (aggregated by source IP) with pfSense tab and configurable timeout/refresh
+
+## [1.0.11.1] - 2025-12-18
+
+### Changed
+- Active IPs: `Bytes Out` now represents client upload (client -> upstream) and accumulates until the IP times out
+
+## [1.0.11.2] - 2025-12-18
+
+### Changed
+- Active IPs: Last Activity now displayed in `America/Sao_Paulo` timezone
+
 ## [1.0.10.7] - 2025-12-18
 
 ### Added

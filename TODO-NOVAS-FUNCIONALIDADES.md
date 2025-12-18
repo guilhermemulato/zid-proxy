@@ -42,6 +42,11 @@
 - [x] No `SIGHUP` do `zid-proxy`: recarregar regras e reabrir o log
 - [x] Ajustar o `zid-proxy-logrotate` para sinalizar `SIGHUP` quando rotacionar (se aplicavel)
 
+### Fase 2.1 — IPs Ativos (monitoramento agregado por IP)
+- [x] Agregar trafego por `srcIP` (bytes/lastActivity/activeConns)
+- [x] Gerar snapshot JSON em `/var/run/zid-proxy.active_ips.json`
+- [x] Aba pfSense “Active IPs” com auto-refresh e tabela
+
 ### Fase 3 — pfSense Web GUI (Settings)
 - [x] Adicionar campo `log_retention_days` no `zid-proxy.xml` (default 7 + validacao)
 - [x] Incluir defaults/validacao no `zid-proxy.inc`

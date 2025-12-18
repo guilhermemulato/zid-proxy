@@ -125,6 +125,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			if (isset($post['log_retention_days']) && trim((string)$post['log_retention_days']) !== '') {
 				$new['log_retention_days'] = trim((string)$post['log_retention_days']);
 			}
+			if (isset($post['active_ips_timeout_seconds']) && trim((string)$post['active_ips_timeout_seconds']) !== '') {
+				$new['active_ips_timeout_seconds'] = trim((string)$post['active_ips_timeout_seconds']);
+			}
+			if (isset($post['active_ips_refresh_seconds']) && trim((string)$post['active_ips_refresh_seconds']) !== '') {
+				$new['active_ips_refresh_seconds'] = trim((string)$post['active_ips_refresh_seconds']);
+			}
 
 			$config['installedpackages']['zidproxy']['config'][0] = $new;
 			write_config("ZID Proxy settings updated");
@@ -139,25 +145,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Populate form config
-$pconfig = [
-	'enable' => $zidcfg['enable'] ?? 'off',
-	'interface' => $zidcfg['interface'] ?? 'all',
-	'listen_port' => $zidcfg['listen_port'] ?? '3129',
-	'enable_logging' => $zidcfg['enable_logging'] ?? 'on',
-	'rules_mode' => $zidcfg['rules_mode'] ?? 'legacy',
-	'timeout' => $zidcfg['timeout'] ?? '30',
-	'log_retention_days' => $zidcfg['log_retention_days'] ?? '7',
-];
+	$pconfig = [
+		'enable' => $zidcfg['enable'] ?? 'off',
+		'interface' => $zidcfg['interface'] ?? 'all',
+		'listen_port' => $zidcfg['listen_port'] ?? '3129',
+		'enable_logging' => $zidcfg['enable_logging'] ?? 'on',
+		'rules_mode' => $zidcfg['rules_mode'] ?? 'legacy',
+		'timeout' => $zidcfg['timeout'] ?? '30',
+		'log_retention_days' => $zidcfg['log_retention_days'] ?? '7',
+		'active_ips_timeout_seconds' => $zidcfg['active_ips_timeout_seconds'] ?? '120',
+		'active_ips_refresh_seconds' => $zidcfg['active_ips_refresh_seconds'] ?? '5',
+	];
 
 include("head.inc");
 
 // Tabs
-$tab_array = array();
-$tab_array[] = array(gettext("Settings"), true, "/zid-proxy_settings.php");
-$tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
-$tab_array[] = array(gettext("Access Rules"), false, "/zid-proxy_rules.php");
-$tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
-display_top_tabs($tab_array);
+	$tab_array = array();
+	$tab_array[] = array(gettext("Settings"), true, "/zid-proxy_settings.php");
+	$tab_array[] = array(gettext("Active IPs"), false, "/zid-proxy_active_ips.php");
+	$tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
+	$tab_array[] = array(gettext("Access Rules"), false, "/zid-proxy_rules.php");
+	$tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
+	display_top_tabs($tab_array);
 
 ?>
 <style>
@@ -285,12 +294,26 @@ $section2->addInput(new Form_Input(
 	$pconfig['timeout']
 ))->setHelp(gettext('Default: 30 (range 1-300).'));
 
-$section2->addInput(new Form_Input(
-	'log_retention_days',
-	gettext('Log Retention Days'),
-	'number',
-	$pconfig['log_retention_days']
-))->setHelp(gettext('How many days of daily rotated logs to keep. Default: 7 (range 1-365).'));
+	$section2->addInput(new Form_Input(
+		'log_retention_days',
+		gettext('Log Retention Days'),
+		'number',
+		$pconfig['log_retention_days']
+	))->setHelp(gettext('How many days of daily rotated logs to keep. Default: 7 (range 1-365).'));
+
+	$section2->addInput(new Form_Input(
+		'active_ips_timeout_seconds',
+		gettext('Active IPs Timeout (s)'),
+		'number',
+		$pconfig['active_ips_timeout_seconds']
+	))->setHelp(gettext('Remove an IP after this many seconds without traffic. Default: 120 (range 10-86400).'));
+
+	$section2->addInput(new Form_Input(
+		'active_ips_refresh_seconds',
+		gettext('Active IPs Refresh (s)'),
+		'number',
+		$pconfig['active_ips_refresh_seconds']
+	))->setHelp(gettext('Snapshot/UI refresh interval. Default: 5 (range 1-300).'));
 
 $form->add($section);
 $form->add($section2);

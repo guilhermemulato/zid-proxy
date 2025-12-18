@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/guilherme/zid-proxy/internal/activeips"
 	"github.com/guilherme/zid-proxy/internal/config"
 	"github.com/guilherme/zid-proxy/internal/logger"
 	"github.com/guilherme/zid-proxy/internal/proxy"
@@ -28,8 +29,21 @@ func main() {
 	flag.StringVar(&cfg.RulesFile, "rules", cfg.RulesFile, "Path to access rules file")
 	flag.StringVar(&cfg.LogFile, "log", cfg.LogFile, "Path to log file")
 	flag.StringVar(&cfg.PidFile, "pid", cfg.PidFile, "Path to PID file")
+	flag.StringVar(&cfg.ActiveIPsFile, "active-ips", cfg.ActiveIPsFile, "Active IPs JSON snapshot output path")
+	activeIPsIntervalSec := flag.Int("active-ips-interval-seconds", int(cfg.ActiveIPsInterval.Seconds()), "How often to write active IPs snapshot (seconds)")
+	activeIPsTimeoutSec := flag.Int("active-ips-timeout-seconds", int(cfg.ActiveIPsTimeout.Seconds()), "Idle timeout to drop IPs from snapshot (seconds)")
+	flag.IntVar(&cfg.ActiveIPsMax, "active-ips-max", cfg.ActiveIPsMax, "Maximum number of tracked IPs")
 	showVersion := flag.Bool("version", false, "Show version and exit")
 	flag.Parse()
+
+	if *activeIPsIntervalSec < 1 {
+		*activeIPsIntervalSec = 1
+	}
+	if *activeIPsTimeoutSec < 5 {
+		*activeIPsTimeoutSec = 5
+	}
+	cfg.ActiveIPsInterval = time.Duration(*activeIPsIntervalSec) * time.Second
+	cfg.ActiveIPsTimeout = time.Duration(*activeIPsTimeoutSec) * time.Second
 
 	if *showVersion {
 		fmt.Printf("zid-proxy version %s (built %s)\n", Version, BuildTime)
@@ -63,11 +77,38 @@ func main() {
 	}
 	log.Printf("Loaded %d rules from %s", ruleSet.RuleCount(), cfg.RulesFile)
 
+	activeTracker := activeips.New(activeips.Options{
+		IdleTimeout: cfg.ActiveIPsTimeout,
+		MaxIPs:      cfg.ActiveIPsMax,
+	})
+
+	// Periodically write snapshot to JSON (and GC idle entries)
+	activeDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(cfg.ActiveIPsInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				now := time.Now()
+				activeTracker.GC(now)
+				snap := activeTracker.Snapshot(now)
+				if err := activeips.WriteSnapshotAtomic(cfg.ActiveIPsFile, snap); err != nil {
+					log.Printf("Warning: failed to write active IPs snapshot: %v", err)
+				}
+			case <-activeDone:
+				return
+			}
+		}
+	}()
+	defer close(activeDone)
+
 	// Create proxy server
 	proxyCfg := proxy.Config{
 		ListenAddr:   cfg.ListenAddr,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
+		ActiveIPs:    activeTracker,
 	}
 	server := proxy.New(proxyCfg, ruleSet, accessLogger)
 

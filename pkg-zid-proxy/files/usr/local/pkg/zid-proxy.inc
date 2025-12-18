@@ -25,6 +25,7 @@ define('ZIDPROXY_LOGROTATE_BINARY', '/usr/local/sbin/zid-proxy-logrotate');
 define('ZIDPROXY_LOGROTATE_CRON_DESCR', 'ZID Proxy: logrotate');
 define('ZIDPROXY_WATCHDOG_SH', '/usr/local/sbin/zid-proxy-watchdog');
 define('ZIDPROXY_WATCHDOG_CRON_DESCR', 'ZID Proxy: watchdog');
+define('ZIDPROXY_ACTIVE_IPS_JSON', '/var/run/zid-proxy.active_ips.json');
 
 function zidproxy_logrotate_cron_command($keep_days) {
 	$keep = is_numeric($keep_days) ? (int)$keep_days : 7;
@@ -432,6 +433,8 @@ function zidproxy_ensure_config_defaults() {
 		'enable_logging' => 'on',
 		'rules_mode' => 'legacy',
 		'log_retention_days' => '7',
+		'active_ips_timeout_seconds' => '120',
+		'active_ips_refresh_seconds' => '5',
 	];
 
 	foreach ($defaults as $k => $v) {
@@ -597,6 +600,18 @@ function zidproxy_validate($post, &$input_errors) {
 		}
 	}
 
+	if (!empty($post['active_ips_timeout_seconds'])) {
+		if (!is_numeric($post['active_ips_timeout_seconds']) || $post['active_ips_timeout_seconds'] < 10 || $post['active_ips_timeout_seconds'] > 86400) {
+			$input_errors[] = "Active IPs timeout must be a number between 10 and 86400 seconds.";
+		}
+	}
+
+	if (!empty($post['active_ips_refresh_seconds'])) {
+		if (!is_numeric($post['active_ips_refresh_seconds']) || $post['active_ips_refresh_seconds'] < 1 || $post['active_ips_refresh_seconds'] > 300) {
+			$input_errors[] = "Active IPs refresh must be a number between 1 and 300 seconds.";
+		}
+	}
+
 	if (!empty($post['rules_mode'])) {
 		$mode = strtolower(trim($post['rules_mode']));
 		if ($mode !== 'legacy' && $mode !== 'groups') {
@@ -653,6 +668,11 @@ function zidproxy_resync() {
 		set_rcvar('zid_proxy_listen', $listen_addr);
 		set_rcvar('zid_proxy_rules', ZIDPROXY_RULES_FILE);
 		set_rcvar('zid_proxy_log', $enable_logging ? ZIDPROXY_LOG_FILE : '/dev/null');
+		$active_ips_timeout = $zidproxy_config['active_ips_timeout_seconds'] ?? '120';
+		$active_ips_refresh = $zidproxy_config['active_ips_refresh_seconds'] ?? '5';
+		set_rcvar('zid_proxy_active_ips_json', ZIDPROXY_ACTIVE_IPS_JSON);
+		set_rcvar('zid_proxy_active_ips_timeout_seconds', $active_ips_timeout);
+		set_rcvar('zid_proxy_active_ips_interval_seconds', $active_ips_refresh);
 
 		// Start or restart service
 		zidproxy_start();
@@ -984,14 +1004,17 @@ load_rc_config $name
 
 : ${zid_proxy_enable:="NO"}
 : ${zid_proxy_listen:=":3129"}
-: ${zid_proxy_rules:="/usr/local/etc/zid-proxy/access_rules.txt"}
-: ${zid_proxy_log:="/var/log/zid-proxy.log"}
-: ${zid_proxy_pid:="/var/run/zid-proxy.pid"}
+	: ${zid_proxy_rules:="/usr/local/etc/zid-proxy/access_rules.txt"}
+	: ${zid_proxy_log:="/var/log/zid-proxy.log"}
+	: ${zid_proxy_pid:="/var/run/zid-proxy.pid"}
+	: ${zid_proxy_active_ips_json:="/var/run/zid-proxy.active_ips.json"}
+	: ${zid_proxy_active_ips_timeout_seconds:="120"}
+	: ${zid_proxy_active_ips_interval_seconds:="5"}
 
 pidfile="${zid_proxy_pid}"
 procname="/usr/local/sbin/zid-proxy"
 command="/usr/sbin/daemon"
-command_args="-f -p ${pidfile} ${procname} -listen ${zid_proxy_listen} -rules ${zid_proxy_rules} -log ${zid_proxy_log} -pid ${zid_proxy_pid}"
+	command_args="-f -p ${pidfile} ${procname} -listen ${zid_proxy_listen} -rules ${zid_proxy_rules} -log ${zid_proxy_log} -pid ${zid_proxy_pid} -active-ips ${zid_proxy_active_ips_json} -active-ips-timeout-seconds ${zid_proxy_active_ips_timeout_seconds} -active-ips-interval-seconds ${zid_proxy_active_ips_interval_seconds}"
 
 start_precmd="zid_proxy_prestart"
 stop_postcmd="zid_proxy_poststop"

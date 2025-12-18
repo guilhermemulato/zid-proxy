@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/guilherme/zid-proxy/internal/activeips"
 	"github.com/guilherme/zid-proxy/internal/logger"
 	"github.com/guilherme/zid-proxy/internal/rules"
 	"github.com/guilherme/zid-proxy/internal/sni"
@@ -19,6 +20,7 @@ type Handler struct {
 	clientConn   net.Conn
 	readTimeout  time.Duration
 	writeTimeout time.Duration
+	activeIPs    *activeips.Tracker
 }
 
 // Handle processes the connection
@@ -26,6 +28,13 @@ func (h *Handler) Handle() {
 	// Get client IP
 	clientAddr := h.clientConn.RemoteAddr().(*net.TCPAddr)
 	clientIP := clientAddr.IP
+	srcIP := clientIP.String()
+
+	if h.activeIPs != nil {
+		now := time.Now()
+		h.activeIPs.ConnStart(srcIP, now)
+		defer h.activeIPs.ConnEnd(srcIP, time.Now())
+	}
 
 	// Set read deadline for ClientHello
 	h.clientConn.SetReadDeadline(time.Now().Add(h.readTimeout))
@@ -83,7 +92,7 @@ func (h *Handler) Handle() {
 	}
 
 	// Allow: proxy the connection
-	h.proxyConnection(hostname, clientHello)
+	h.proxyConnection(srcIP, hostname, clientHello)
 }
 
 // sendRST sends a TCP RST by setting linger to 0 before closing
@@ -95,7 +104,7 @@ func (h *Handler) sendRST() {
 }
 
 // proxyConnection establishes a connection to the upstream server and proxies traffic
-func (h *Handler) proxyConnection(hostname string, clientHello []byte) {
+func (h *Handler) proxyConnection(srcIP string, hostname string, clientHello []byte) {
 	// Connect to the original destination (the hostname from SNI)
 	// We connect to port 443 as this is HTTPS traffic
 	upstreamAddr := net.JoinHostPort(hostname, "443")
@@ -114,14 +123,19 @@ func (h *Handler) proxyConnection(hostname string, clientHello []byte) {
 
 	// Send the captured ClientHello to upstream
 	upstreamConn.SetWriteDeadline(time.Now().Add(h.writeTimeout))
-	if _, err := upstreamConn.Write(clientHello); err != nil {
+	n, err := upstreamConn.Write(clientHello)
+	if h.activeIPs != nil && n > 0 {
+		// Treat "Bytes Out" as client -> upstream (upload).
+		h.activeIPs.AddBytes(srcIP, 0, uint64(n), time.Now())
+	}
+	if err != nil {
 		log.Printf("Failed to send ClientHello to upstream %s: %v", upstreamAddr, err)
 		return
 	}
 	upstreamConn.SetWriteDeadline(time.Time{})
 
 	// Bidirectional proxy
-	h.bidirectionalCopy(h.clientConn, upstreamConn)
+	h.bidirectionalCopy(srcIP, h.clientConn, upstreamConn)
 }
 
 // isPrivateIP checks if an IP belongs to a private network (RFC 1918 + loopback)
@@ -162,10 +176,10 @@ func isPrivateIP(ip net.IP) bool {
 //
 // WORKAROUND (Recommended):
 // Exclude specific IPs from NAT redirect in pfSense:
-//   1. Firewall > NAT > Port Forward
-//   2. Edit the rule that redirects port 443 to proxy
-//   3. Destination: Invert match (NOT) → Single host → 192.168.1.1
-//   4. Save & Apply
+//  1. Firewall > NAT > Port Forward
+//  2. Edit the rule that redirects port 443 to proxy
+//  3. Destination: Invert match (NOT) → Single host → 192.168.1.1
+//  4. Save & Apply
 //
 // This allows direct access to pfSense GUI and other local services by IP.
 //
@@ -178,14 +192,14 @@ func (h *Handler) proxyConnectionNoSNI(clientAddr *net.TCPAddr) {
 }
 
 // bidirectionalCopy copies data between two connections in both directions
-func (h *Handler) bidirectionalCopy(client, upstream net.Conn) {
+func (h *Handler) bidirectionalCopy(srcIP string, client, upstream net.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	// Copy from client to upstream
 	go func() {
 		defer wg.Done()
-		io.Copy(upstream, client)
+		h.copyWithActivity(srcIP, upstream, client, true)
 		// Signal upstream that we're done sending
 		if tcpConn, ok := upstream.(*net.TCPConn); ok {
 			tcpConn.CloseWrite()
@@ -195,7 +209,7 @@ func (h *Handler) bidirectionalCopy(client, upstream net.Conn) {
 	// Copy from upstream to client
 	go func() {
 		defer wg.Done()
-		io.Copy(client, upstream)
+		h.copyWithActivity(srcIP, client, upstream, false)
 		// Signal client that we're done sending
 		if tcpConn, ok := client.(*net.TCPConn); ok {
 			tcpConn.CloseWrite()
@@ -203,6 +217,35 @@ func (h *Handler) bidirectionalCopy(client, upstream net.Conn) {
 	}()
 
 	wg.Wait()
+}
+
+func (h *Handler) copyWithActivity(srcIP string, dst io.Writer, src io.Reader, clientToUpstream bool) {
+	buf := make([]byte, 32*1024)
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[:nr])
+			if h.activeIPs != nil && nw > 0 {
+				now := time.Now()
+				if clientToUpstream {
+					// Treat "Bytes Out" as client -> upstream (upload).
+					h.activeIPs.AddBytes(srcIP, 0, uint64(nw), now)
+				} else {
+					// Treat "Bytes In" as upstream -> client (download).
+					h.activeIPs.AddBytes(srcIP, uint64(nw), 0, now)
+				}
+			}
+			if ew != nil {
+				return
+			}
+			if nw != nr {
+				return
+			}
+		}
+		if er != nil {
+			return
+		}
+	}
 }
 
 // MultiReader wraps multiple readers for replaying ClientHello

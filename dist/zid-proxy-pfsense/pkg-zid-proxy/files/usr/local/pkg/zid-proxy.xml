@@ -39,6 +39,10 @@
 			<active/>
 		</tab>
 		<tab>
+			<text>Active IPs</text>
+			<url>/zid-proxy_active_ips.php</url>
+		</tab>
+		<tab>
 			<text>Groups</text>
 			<url>/zid-proxy_groups.php</url>
 		</tab>
@@ -129,6 +133,22 @@
 			<size>6</size>
 			<default>7</default>
 			<description><![CDATA[How many days of daily rotated logs to keep. Default: 7]]></description>
+		</field>
+		<field>
+			<fielddescr>Active IPs Timeout (seconds)</fielddescr>
+			<fieldname>active_ips_timeout_seconds</fieldname>
+			<type>input</type>
+			<size>6</size>
+			<default>120</default>
+			<description><![CDATA[Remove an IP from the Active IPs list after this many seconds without traffic. Default: 120]]></description>
+		</field>
+		<field>
+			<fielddescr>Active IPs Refresh (seconds)</fielddescr>
+			<fieldname>active_ips_refresh_seconds</fieldname>
+			<type>input</type>
+			<size>6</size>
+			<default>5</default>
+			<description><![CDATA[How often to refresh the Active IPs snapshot and UI. Default: 5]]></description>
 		</field>
 	</fields>
 
