@@ -47,25 +47,32 @@ cp ${FILES_DIR}${PREFIX}/pkg/zid-proxy.inc ${PREFIX}/pkg/
 
 # Install web pages
 echo "Installing web pages..."
-cp ${FILES_DIR}${PREFIX}/www/zid-proxy_rules.php ${PREFIX}/www/
-cp ${FILES_DIR}${PREFIX}/www/zid-proxy_log.php ${PREFIX}/www/
+cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_rules.php ${PREFIX}/www/
+cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_log.php ${PREFIX}/www/
+cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_groups.php ${PREFIX}/www/
 
 # Install privilege definitions
 echo "Installing privilege definitions..."
-cp ${FILES_DIR}/etc/inc/priv/zid-proxy.priv.inc /etc/inc/priv/
+cp -f ${FILES_DIR}/etc/inc/priv/zid-proxy.priv.inc /etc/inc/priv/
 
 # Install package info
 echo "Installing package info..."
-cp ${FILES_DIR}${PREFIX}/share/pfSense-pkg-zid-proxy/info.xml ${PREFIX}/share/pfSense-pkg-zid-proxy/
+cp -f ${FILES_DIR}${PREFIX}/share/pfSense-pkg-zid-proxy/info.xml ${PREFIX}/share/pfSense-pkg-zid-proxy/
 
 # Install updater helper (so future updates don't require manual tar/scp)
 if [ -f "${PKG_DIR}/update-bootstrap.sh" ]; then
     echo "Installing updater helper..."
-    cp "${PKG_DIR}/update-bootstrap.sh" "${PREFIX}/sbin/zid-proxy-update"
-    chmod 755 "${PREFIX}/sbin/zid-proxy-update"
-    # Keep a copy alongside package info for reference
-    cp "${PKG_DIR}/update-bootstrap.sh" "${PREFIX}/share/pfSense-pkg-zid-proxy/zid-proxy-update"
-    chmod 755 "${PREFIX}/share/pfSense-pkg-zid-proxy/zid-proxy-update"
+    # Avoid truncating a currently-running updater script (can cause odd errors).
+    TMP_UPDATER="${PREFIX}/sbin/.zid-proxy-update.new.$$"
+    cp "${PKG_DIR}/update-bootstrap.sh" "${TMP_UPDATER}"
+    chmod 755 "${TMP_UPDATER}"
+    mv -f "${TMP_UPDATER}" "${PREFIX}/sbin/zid-proxy-update"
+
+    # Keep a copy alongside package info for reference (also atomic).
+    TMP_UPDATER_INFO="${PREFIX}/share/pfSense-pkg-zid-proxy/.zid-proxy-update.new.$$"
+    cp "${PKG_DIR}/update-bootstrap.sh" "${TMP_UPDATER_INFO}"
+    chmod 755 "${TMP_UPDATER_INFO}"
+    mv -f "${TMP_UPDATER_INFO}" "${PREFIX}/share/pfSense-pkg-zid-proxy/zid-proxy-update"
 fi
 
 # Check if binary exists in parent directory
@@ -110,6 +117,7 @@ chmod 644 ${PREFIX}/pkg/zid-proxy.xml
 chmod 644 ${PREFIX}/pkg/zid-proxy.inc
 chmod 644 ${PREFIX}/www/zid-proxy_rules.php
 chmod 644 ${PREFIX}/www/zid-proxy_log.php
+chmod 644 ${PREFIX}/www/zid-proxy_groups.php
 chmod 644 /etc/inc/priv/zid-proxy.priv.inc
 
 echo ""
@@ -145,18 +153,17 @@ if [ -f "${SCRIPT_DIR}/activate-package.php" ]; then
                 echo ""
 
                 # Reload pfSense web GUI to make menu appear
-                echo "Reloading pfSense web GUI..."
-                /etc/rc.restart_webgui 2>/dev/null &
-                reload_result=$?
-
-                if [ $reload_result -eq 0 ]; then
-                    echo "[OK] Web GUI reload initiated"
-                    echo ""
-                    echo "IMPORTANT: Wait ~10 seconds, then reload your browser (Ctrl+Shift+R) to see the new menu"
-                else
-                    echo "[WARNING] Web GUI reload may have failed"
-                    echo "          Try manually: /etc/rc.restart_webgui"
+                echo "Reloading pfSense web GUI (to pick up updated PHP pages)..."
+                if [ -x /usr/local/sbin/pfSsh.php ]; then
+                    /usr/local/sbin/pfSsh.php playback reloadwebgui >/dev/null 2>&1 || true
+                elif [ -x /etc/rc.restart_webgui ]; then
+                    /etc/rc.restart_webgui >/dev/null 2>&1 || true
+                elif [ -x /usr/local/etc/rc.d/php-fpm ]; then
+                    /usr/local/etc/rc.d/php-fpm restart >/dev/null 2>&1 || true
                 fi
+                echo "[OK] Web GUI reload requested"
+                echo ""
+                echo "IMPORTANT: Wait ~10 seconds, then reload your browser (Ctrl+Shift+R)"
                 echo ""
             else
                 echo "[ERROR] Package registration failed!"

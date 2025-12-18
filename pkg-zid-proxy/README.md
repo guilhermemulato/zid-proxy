@@ -39,6 +39,16 @@ sh /usr/local/sbin/zid-proxy-update
 Note: `/usr/local/sbin/zid-proxy-update` is a small bootstrap wrapper that always runs the
 `pkg-zid-proxy/update.sh` from the latest bundle (so updater fixes don’t require reinstall).
 
+## Groups Mode (New)
+
+The package supports a group-based rules mode in the pfSense GUI:
+- Open **Services > ZID Proxy > Groups**
+- Create ordered groups (top = highest priority)
+- Add members (IP/CIDR) and hostname rules (ALLOW/BLOCK)
+- The package will generate `GROUP;...` / `MEMBER;...` rules into `/usr/local/etc/zid-proxy/access_rules.txt`
+
+When **Rules Mode = Groups**, the **Access Rules** tab is disabled to avoid overwriting the grouped file.
+
 ### activate-package.php
 Activates the package by executing PHP installation hooks:
 - Creates the RC service script

@@ -60,6 +60,10 @@ service zid-proxy start
 
 Located at `/usr/local/etc/zid-proxy/access_rules.txt`
 
+Two formats are supported:
+
+**1) Legacy (compatible with pfSense GUI)**
+
 Format: `TYPE;IP_OR_CIDR;HOSTNAME`
 
 ```
@@ -74,10 +78,35 @@ ALLOW;192.168.1.100;*.facebook.com
 BLOCK;192.168.1.50;*.netflix.com
 ```
 
+**2) Grouped (ordered groups)**
+
+Groups are evaluated top-to-bottom. If an IP matches multiple groups, the **first group wins** and only that group’s rules apply.
+
+Format:
+
+```
+GROUP;group_name
+MEMBER;IP_OR_CIDR
+ALLOW;HOSTNAME
+BLOCK;HOSTNAME
+```
+
+Example:
+
+```
+GROUP;acesso_liberado
+MEMBER;192.168.1.0/24
+ALLOW;*.facebook.com
+
+GROUP;acesso_restrito
+MEMBER;192.168.1.50
+BLOCK;*.facebook.com
+```
+
 ### Rule Matching Logic
 
-1. Rules are evaluated in order
-2. **ALLOW** rules have priority over BLOCK rules
+1. **Grouped mode**: select the first matching group by source IP (order matters)
+2. **ALLOW** rules have priority over BLOCK rules (within the applicable rules)
 3. If no rule matches, the connection is **ALLOWED** (default)
 4. Hostname wildcards: `*.example.com` matches `www.example.com`, `api.example.com`, and `example.com`
 
@@ -104,8 +133,8 @@ service zid-proxy reload    # Reload rules (SIGHUP)
 Location: `/var/log/zid-proxy.log`
 
 ```
-2025-01-15T10:30:45Z | 192.168.1.100 | www.facebook.com | ALLOW
-2025-01-15T10:30:46Z | 192.168.1.50 | www.facebook.com | BLOCK
+2025-01-15T10:30:45Z | 192.168.1.100 | www.facebook.com | acesso_liberado | ALLOW
+2025-01-15T10:30:46Z | 192.168.1.50 | www.facebook.com | acesso_restrito | BLOCK
 ```
 
 ## Firewall Integration

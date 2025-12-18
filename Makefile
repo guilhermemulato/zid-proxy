@@ -1,7 +1,7 @@
 .PHONY: all build build-freebsd clean test install
 
 BINARY=zid-proxy
-VERSION=1.0.8
+VERSION=1.0.9
 BUILD_DIR=build
 LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION)"
 

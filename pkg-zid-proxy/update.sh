@@ -23,16 +23,18 @@ URL_DEFAULT="https://s3.soulsolucoes.com.br/soul/portal/zid-proxy-pfsense-latest
 URL="${ZID_PROXY_UPDATE_URL:-$URL_DEFAULT}"
 KEEP_TMP=0
 WAS_RUNNING=0
+FORCE=0
 
 usage() {
 	cat <<EOF
 ZID Proxy updater
 
 Usage:
-  sh update.sh [-u <url>] [-k]
+  sh update.sh [-u <url>] [-f] [-k]
 
 Options:
   -u <url>  Bundle URL (default: ${URL_DEFAULT})
+  -f        Force update (skip version check)
   -k        Keep temporary directory (debug)
 EOF
 }
@@ -40,6 +42,13 @@ EOF
 die() {
 	echo "ERROR: $*" >&2
 	exit 1
+}
+
+sha256_file() {
+	# pfSense/FreeBSD usually provides "sha256". If not present, return empty.
+	if command -v sha256 >/dev/null 2>&1; then
+		sha256 -q "$1" 2>/dev/null || true
+	fi
 }
 
 pids() {
@@ -50,9 +59,10 @@ pids() {
 	ps ax -o pid= -o command= | awk '/\/usr\/local\/sbin\/zid-proxy/ {print $1}'
 }
 
-while getopts "u:kh" opt; do
+while getopts "u:fkh" opt; do
 	case "$opt" in
 		u) URL="$OPTARG" ;;
+		f) FORCE=1 ;;
 		k) KEEP_TMP=1 ;;
 		h) usage; exit 0 ;;
 		*) usage; exit 2 ;;
@@ -74,6 +84,37 @@ elif command -v curl >/dev/null 2>&1; then
 	DOWNLOADER="curl"
 else
 	die "Neither 'fetch' nor 'curl' found (pfSense usually provides 'fetch')"
+fi
+
+get_local_version() {
+	if [ -x /usr/local/sbin/zid-proxy ]; then
+		/usr/local/sbin/zid-proxy -version 2>/dev/null | awk '{print $3}' | head -n 1 | tr -d '\r'
+	fi
+}
+
+get_remote_version() {
+	version_url="$1"
+	if [ "${DOWNLOADER}" = "fetch" ]; then
+		fetch -q -o - "${version_url}" 2>/dev/null | head -n 1 | tr -d '\r'
+	else
+		curl -fsSL "${version_url}" 2>/dev/null | head -n 1 | tr -d '\r'
+	fi
+}
+
+version_url="${URL}"
+case "${version_url}" in
+	*.tar.gz) version_url="${version_url%.tar.gz}.version" ;;
+	*.tgz) version_url="${version_url%.tgz}.version" ;;
+	*) version_url="${version_url}.version" ;;
+esac
+
+if [ "${FORCE}" -eq 0 ]; then
+	local_version="$(get_local_version || true)"
+	remote_version="$(get_remote_version "${version_url}" || true)"
+	if [ -n "${remote_version}" ] && [ -n "${local_version}" ] && [ "${remote_version}" = "${local_version}" ]; then
+		echo "Already up-to-date (version ${local_version})."
+		exit 0
+	fi
 fi
 
 TMP_DIR="$(mktemp -d /tmp/zid-proxy-update.XXXXXX)"
@@ -150,6 +191,15 @@ fi
 
 PKG_DIR="$(dirname "${INSTALL_SH}")"
 
+echo ""
+echo "Bundle verification:"
+if [ -f "${PKG_DIR}/files/usr/local/www/zid-proxy_log.php" ]; then
+	HASH_SRC="$(sha256_file "${PKG_DIR}/files/usr/local/www/zid-proxy_log.php")"
+	if [ -n "${HASH_SRC}" ]; then
+		echo "  src zid-proxy_log.php sha256: ${HASH_SRC}"
+	fi
+fi
+
 # Detect if service is running before update (so we can restart at the end).
 if [ -n "$(pids | head -n 1)" ]; then
 	WAS_RUNNING=1
@@ -160,6 +210,16 @@ stop_all
 echo ""
 echo "Applying update from: ${PKG_DIR}"
 sh "${INSTALL_SH}"
+
+# Verify destination file hash (helps diagnose “updated but GUI unchanged” cases)
+if [ -f /usr/local/www/zid-proxy_log.php ]; then
+	HASH_DST="$(sha256_file /usr/local/www/zid-proxy_log.php)"
+	if [ -n "${HASH_DST}" ]; then
+		echo ""
+		echo "Installed verification:"
+		echo "  dst zid-proxy_log.php sha256: ${HASH_DST}"
+	fi
+fi
 
 # Safety net: restore rules file only if it disappeared (install.sh won't overwrite it).
 RULES_FILE="/usr/local/etc/zid-proxy/access_rules.txt"
@@ -191,6 +251,16 @@ if [ "${WAS_RUNNING}" -eq 1 ]; then
 	fi
 else
 	echo "(Service was not running before update; not forcing start.)"
+fi
+
+echo ""
+echo "Reloading pfSense web GUI (to pick up updated PHP pages)..."
+if [ -x /usr/local/sbin/pfSsh.php ]; then
+	/usr/local/sbin/pfSsh.php playback reloadwebgui >/dev/null 2>&1 || true
+elif [ -x /etc/rc.restart_webgui ]; then
+	/etc/rc.restart_webgui >/dev/null 2>&1 || true
+elif [ -x /usr/local/etc/rc.d/php-fpm ]; then
+	/usr/local/etc/rc.d/php-fpm restart >/dev/null 2>&1 || true
 fi
 
 echo ""

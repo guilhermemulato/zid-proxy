@@ -39,6 +39,10 @@
 			<active/>
 		</tab>
 		<tab>
+			<text>Groups</text>
+			<url>/zid-proxy_groups.php</url>
+		</tab>
+		<tab>
 			<text>Access Rules</text>
 			<url>/zid-proxy_rules.php</url>
 		</tab>
@@ -98,6 +102,19 @@
 			<name>Advanced Settings</name>
 		</field>
 		<field>
+			<fielddescr>Rules Mode</fielddescr>
+			<fieldname>rules_mode</fieldname>
+			<type>select</type>
+			<default>legacy</default>
+			<options>
+				<option><name>Legacy (IP/CIDR + Hostname rules)</name><value>legacy</value></option>
+				<option><name>Groups (ordered groups + hostname rules)</name><value>groups</value></option>
+			</options>
+			<description><![CDATA[Select how rules are generated.<br/>
+			<strong>Legacy</strong>: Uses the Access Rules tab (pfSense GUI).<br/>
+			<strong>Groups</strong>: Uses the Groups tab. Order matters; first matching group wins.]]></description>
+		</field>
+		<field>
 			<fielddescr>Connection Timeout</fielddescr>
 			<fieldname>timeout</fieldname>
 			<type>input</type>
@@ -123,6 +140,10 @@
 		<columnitem>
 			<fielddescr>Logging</fielddescr>
 			<fieldname>enable_logging</fieldname>
+		</columnitem>
+		<columnitem>
+			<fielddescr>Rules Mode</fielddescr>
+			<fieldname>rules_mode</fieldname>
 		</columnitem>
 		<columnitem>
 			<fielddescr>Timeout (s)</fielddescr>

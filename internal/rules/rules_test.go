@@ -164,14 +164,75 @@ BLOCK;10.0.0.50;*.netflix.com
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srcIP := net.ParseIP(tt.srcIP)
-			action, matched := rs.Match(srcIP, tt.hostname)
+			action, matched, group := rs.Match(srcIP, tt.hostname)
 			if action != tt.wantAction {
 				t.Errorf("action = %s, want %s", action, tt.wantAction)
 			}
 			if matched != tt.wantMatch {
 				t.Errorf("matched = %v, want %v", matched, tt.wantMatch)
 			}
+			if group != "" {
+				t.Errorf("expected empty group for legacy rules, got %q", group)
+			}
 		})
+	}
+}
+
+func TestRuleSetMatch_GroupedRules_FirstGroupWins(t *testing.T) {
+	content := `# Groups are evaluated in order; first membership match wins
+GROUP;acesso_liberado
+MEMBER;192.168.1.0/24
+ALLOW;*.facebook.com
+
+GROUP;acesso_restrito
+MEMBER;192.168.1.50
+BLOCK;*.facebook.com
+`
+	tmpFile := createTempRulesFile(t, content)
+	defer os.Remove(tmpFile)
+
+	rs := NewRuleSet(tmpFile)
+	if err := rs.Load(); err != nil {
+		t.Fatalf("failed to load rules: %v", err)
+	}
+
+	srcIP := net.ParseIP("192.168.1.50")
+	action, matched, group := rs.Match(srcIP, "www.facebook.com")
+	if action != RuleAllow || !matched || group != "acesso_liberado" {
+		t.Fatalf("got action=%s matched=%v group=%q; want ALLOW true acesso_liberado", action, matched, group)
+	}
+}
+
+func TestRuleSetMatch_GroupedRules_DefaultAllowWithinGroup(t *testing.T) {
+	content := `GROUP;acesso_controlado
+MEMBER;10.0.0.0/8
+BLOCK;*.netflix.com
+`
+	tmpFile := createTempRulesFile(t, content)
+	defer os.Remove(tmpFile)
+
+	rs := NewRuleSet(tmpFile)
+	if err := rs.Load(); err != nil {
+		t.Fatalf("failed to load rules: %v", err)
+	}
+
+	srcIP := net.ParseIP("10.1.2.3")
+	action, matched, group := rs.Match(srcIP, "www.google.com")
+	if action != RuleAllow || matched {
+		t.Fatalf("got action=%s matched=%v; want ALLOW false", action, matched)
+	}
+	if group != "acesso_controlado" {
+		t.Fatalf("got group=%q; want acesso_controlado", group)
+	}
+}
+
+func TestParseRule_StripsInlineComment(t *testing.T) {
+	rule, err := parseRule("BLOCK;192.168.1.0/24;*.facebook.com # social")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rule.Hostname != "*.facebook.com" {
+		t.Fatalf("got hostname=%q; want %q", rule.Hostname, "*.facebook.com")
 	}
 }
 

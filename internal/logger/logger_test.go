@@ -25,6 +25,7 @@ func TestLogger(t *testing.T) {
 		Timestamp: testTime,
 		SourceIP:  "192.168.1.100",
 		Hostname:  "www.example.com",
+		Group:     "acesso_liberado",
 		Action:    ActionAllow,
 	})
 
@@ -32,6 +33,7 @@ func TestLogger(t *testing.T) {
 		Timestamp: testTime.Add(time.Second),
 		SourceIP:  "192.168.1.50",
 		Hostname:  "blocked.example.com",
+		Group:     "acesso_restrito",
 		Action:    ActionBlock,
 	})
 
@@ -78,7 +80,7 @@ func TestLoggerReopen(t *testing.T) {
 	}
 
 	// Log entry before reopen
-	logger.LogConnection("10.0.0.1", "before.example.com", ActionAllow)
+	logger.LogConnection("10.0.0.1", "before.example.com", "g1", ActionAllow)
 	logger.Flush()
 
 	// Reopen (simulating log rotation)
@@ -87,7 +89,7 @@ func TestLoggerReopen(t *testing.T) {
 	}
 
 	// Log entry after reopen
-	logger.LogConnection("10.0.0.2", "after.example.com", ActionBlock)
+	logger.LogConnection("10.0.0.2", "after.example.com", "g2", ActionBlock)
 	logger.Close()
 
 	// Verify both entries exist
@@ -113,6 +115,7 @@ func TestWriterLogger(t *testing.T) {
 		Timestamp: testTime,
 		SourceIP:  "192.168.1.1",
 		Hostname:  "test.example.com",
+		Group:     "acesso_controlado",
 		Action:    ActionBlock,
 	})
 
@@ -135,7 +138,7 @@ func TestNullLogger(t *testing.T) {
 	logger := NewNullLogger()
 
 	// These should not panic
-	logger.LogConnection("192.168.1.1", "example.com", ActionAllow)
+	logger.LogConnection("192.168.1.1", "example.com", "", ActionAllow)
 	logger.Log(Entry{})
 
 	if err := logger.Flush(); err != nil {
@@ -160,6 +163,7 @@ func BenchmarkLogger(b *testing.B) {
 		Timestamp: time.Now(),
 		SourceIP:  "192.168.1.100",
 		Hostname:  "www.example.com",
+		Group:     "g",
 		Action:    ActionAllow,
 	}
 

@@ -107,7 +107,8 @@ if (empty($config['installedpackages']['zidproxy']['config'])) {
         'interface' => 'all',  // Changed from 'lan' to 'all' for better NAT compatibility
         'listen_port' => '3129',
         'timeout' => '30',
-        'enable_logging' => 'on'
+        'enable_logging' => 'on',
+        'rules_mode' => 'legacy'
     );
     echo "  ✓ Default config created (interface: all, port: 3129)\n";
 }

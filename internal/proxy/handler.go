@@ -58,7 +58,7 @@ func (h *Handler) Handle() {
 	h.clientConn.SetReadDeadline(time.Time{})
 
 	// Match against rules
-	action, matched := h.server.rules.Match(clientIP, hostname)
+	action, matched, groupName := h.server.rules.Match(clientIP, hostname)
 
 	// Convert to logger action
 	var logAction logger.Action
@@ -69,7 +69,7 @@ func (h *Handler) Handle() {
 	}
 
 	// Log the connection
-	h.server.logger.LogConnection(clientIP.String(), hostname, logAction)
+	h.server.logger.LogConnection(clientIP.String(), hostname, groupName, logAction)
 
 	if matched {
 		log.Printf("%s | %s -> %s | %s (matched rule)", clientIP, hostname, action, logAction)

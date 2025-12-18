@@ -24,10 +24,25 @@ type Rule struct {
 	Hostname string // Supports wildcards like *.example.com
 }
 
+// GroupRule represents a hostname rule bound to a group.
+type GroupRule struct {
+	Type     RuleType
+	Hostname string
+}
+
+// Group represents an ordered group of members and hostname rules.
+// The first matching group (by SourceIP membership) wins.
+type Group struct {
+	Name    string
+	Members []*net.IPNet
+	Rules   []GroupRule
+}
+
 // RuleSet manages a collection of access rules
 type RuleSet struct {
 	mu       sync.RWMutex
-	rules    []Rule
+	rules    []Rule  // legacy format: TYPE;IP_OR_CIDR;HOSTNAME
+	groups   []Group // grouped format: GROUP/MEMBER + ALLOW/BLOCK
 	filePath string
 }
 
@@ -36,6 +51,7 @@ func NewRuleSet(filePath string) *RuleSet {
 	return &RuleSet{
 		filePath: filePath,
 		rules:    make([]Rule, 0),
+		groups:   make([]Group, 0),
 	}
 }
 
@@ -54,6 +70,7 @@ func (rs *RuleSet) Reload() error {
 
 	// Clear existing rules
 	rs.rules = rs.rules[:0]
+	rs.groups = rs.groups[:0]
 
 	return rs.loadInternal()
 }
@@ -69,6 +86,10 @@ func (rs *RuleSet) loadInternal() error {
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
 
+	var currentGroup *Group
+	seenGroups := map[string]struct{}{}
+	var groupMode bool
+
 	for scanner.Scan() {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
@@ -78,11 +99,76 @@ func (rs *RuleSet) loadInternal() error {
 			continue
 		}
 
+		line = stripInlineComment(line)
+		if line == "" {
+			continue
+		}
+
+		stmt, parts := splitStatement(line)
+		switch stmt {
+		case "GROUP":
+			groupMode = true
+			if len(parts) != 1 {
+				return fmt.Errorf("line %d: invalid GROUP format: expected GROUP;NAME", lineNum)
+			}
+			name := strings.TrimSpace(parts[0])
+			if name == "" {
+				return fmt.Errorf("line %d: group name cannot be empty", lineNum)
+			}
+			if _, exists := seenGroups[name]; exists {
+				return fmt.Errorf("line %d: duplicate group name: %s", lineNum, name)
+			}
+			seenGroups[name] = struct{}{}
+
+			rs.groups = append(rs.groups, Group{Name: name})
+			currentGroup = &rs.groups[len(rs.groups)-1]
+			continue
+
+		case "MEMBER":
+			groupMode = true
+			if currentGroup == nil {
+				return fmt.Errorf("line %d: MEMBER must appear after GROUP", lineNum)
+			}
+			if len(parts) != 1 {
+				return fmt.Errorf("line %d: invalid MEMBER format: expected MEMBER;IP_OR_CIDR", lineNum)
+			}
+			ipNet, err := parseIPOrCIDR(strings.TrimSpace(parts[0]))
+			if err != nil {
+				return fmt.Errorf("line %d: invalid MEMBER IP/CIDR: %w", lineNum, err)
+			}
+			currentGroup.Members = append(currentGroup.Members, ipNet)
+			continue
+
+		case "ALLOW", "BLOCK":
+			// Disambiguation:
+			// - Grouped rule:  "ALLOW;HOSTNAME" / "BLOCK;HOSTNAME" (1 arg)
+			// - Legacy rule:   "ALLOW;IP;HOSTNAME" / "BLOCK;IP;HOSTNAME" (2 args)
+			if len(parts) == 1 {
+				groupMode = true
+				if currentGroup == nil {
+					return fmt.Errorf("line %d: %s must appear after GROUP", lineNum, stmt)
+				}
+				hostname := strings.ToLower(strings.TrimSpace(parts[0]))
+				if hostname == "" {
+					return fmt.Errorf("line %d: hostname cannot be empty", lineNum)
+				}
+				rt := RuleAllow
+				if stmt == "BLOCK" {
+					rt = RuleBlock
+				}
+				currentGroup.Rules = append(currentGroup.Rules, GroupRule{Type: rt, Hostname: hostname})
+				continue
+			}
+		}
+
+		if groupMode {
+			return fmt.Errorf("line %d: invalid statement in group rules file: %s", lineNum, line)
+		}
+
 		rule, err := parseRule(line)
 		if err != nil {
 			return fmt.Errorf("line %d: %w", lineNum, err)
 		}
-
 		rs.rules = append(rs.rules, rule)
 	}
 
@@ -102,7 +188,10 @@ func parseRule(line string) (Rule, error) {
 
 	ruleType := strings.ToUpper(strings.TrimSpace(parts[0]))
 	ipStr := strings.TrimSpace(parts[1])
-	hostname := strings.ToLower(strings.TrimSpace(parts[2]))
+	hostname := strings.ToLower(strings.TrimSpace(stripInlineComment(parts[2])))
+	if hostname == "" {
+		return Rule{}, fmt.Errorf("hostname cannot be empty")
+	}
 
 	// Validate rule type
 	var rt RuleType
@@ -157,15 +246,61 @@ func parseIPOrCIDR(s string) (*net.IPNet, error) {
 	}, nil
 }
 
-// Match checks if a connection from srcIP to hostname matches any rule
-// Returns the action to take and whether a rule was matched
-// Priority: ALLOW > BLOCK
+// Match checks if a connection from srcIP to hostname matches any rule.
+//
+// In grouped mode, the first matching group (by membership) is selected, and only its rules apply.
+// In legacy mode, all rules apply.
+//
+// Priority (within applicable rules): ALLOW > BLOCK
 // Default: ALLOW if no rule matches
-func (rs *RuleSet) Match(srcIP net.IP, hostname string) (action RuleType, matched bool) {
+func (rs *RuleSet) Match(srcIP net.IP, hostname string) (action RuleType, matched bool, groupName string) {
 	rs.mu.RLock()
 	defer rs.mu.RUnlock()
 
 	hostname = strings.ToLower(hostname)
+
+	// Grouped rules file: pick the first group that contains srcIP.
+	if len(rs.groups) > 0 {
+		selectedIdx := -1
+		for i, g := range rs.groups {
+			for _, member := range g.Members {
+				if member.Contains(srcIP) {
+					selectedIdx = i
+					break
+				}
+			}
+			if selectedIdx != -1 {
+				break
+			}
+		}
+
+		if selectedIdx == -1 {
+			return RuleAllow, false, ""
+		}
+
+		group := rs.groups[selectedIdx]
+		groupName = group.Name
+
+		var allowMatched bool
+		var blockMatched bool
+		for _, rule := range group.Rules {
+			if matchHostname(rule.Hostname, hostname) {
+				if rule.Type == RuleAllow {
+					allowMatched = true
+				} else {
+					blockMatched = true
+				}
+			}
+		}
+
+		if allowMatched {
+			return RuleAllow, true, groupName
+		}
+		if blockMatched {
+			return RuleBlock, true, groupName
+		}
+		return RuleAllow, false, groupName
+	}
 
 	var allowMatched bool
 	var blockMatched bool
@@ -183,15 +318,15 @@ func (rs *RuleSet) Match(srcIP net.IP, hostname string) (action RuleType, matche
 
 	// Priority: ALLOW > BLOCK
 	if allowMatched {
-		return RuleAllow, true
+		return RuleAllow, true, ""
 	}
 
 	if blockMatched {
-		return RuleBlock, true
+		return RuleBlock, true, ""
 	}
 
 	// Default: ALLOW if no rule matches
-	return RuleAllow, false
+	return RuleAllow, false, ""
 }
 
 // matchRule checks if a single rule matches the given connection
@@ -232,7 +367,11 @@ func matchHostname(pattern, hostname string) bool {
 func (rs *RuleSet) RuleCount() int {
 	rs.mu.RLock()
 	defer rs.mu.RUnlock()
-	return len(rs.rules)
+	count := len(rs.rules)
+	for _, g := range rs.groups {
+		count += len(g.Rules)
+	}
+	return count
 }
 
 // String returns a string representation of the rules for debugging
@@ -241,9 +380,40 @@ func (rs *RuleSet) String() string {
 	defer rs.mu.RUnlock()
 
 	var sb strings.Builder
+	if len(rs.groups) > 0 {
+		sb.WriteString(fmt.Sprintf("RuleSet (%d groups):\n", len(rs.groups)))
+		for gi, g := range rs.groups {
+			sb.WriteString(fmt.Sprintf("  %d: GROUP %s (%d members, %d rules)\n", gi+1, g.Name, len(g.Members), len(g.Rules)))
+		}
+		return sb.String()
+	}
+
 	sb.WriteString(fmt.Sprintf("RuleSet (%d rules):\n", len(rs.rules)))
 	for i, r := range rs.rules {
 		sb.WriteString(fmt.Sprintf("  %d: %s %s %s\n", i+1, r.Type, r.SourceIP, r.Hostname))
 	}
 	return sb.String()
+}
+
+func stripInlineComment(s string) string {
+	if idx := strings.Index(s, "#"); idx >= 0 {
+		return strings.TrimSpace(s[:idx])
+	}
+	return strings.TrimSpace(s)
+}
+
+func splitStatement(line string) (string, []string) {
+	parts := strings.Split(line, ";")
+	if len(parts) == 0 {
+		return "", nil
+	}
+	stmt := strings.ToUpper(strings.TrimSpace(parts[0]))
+	if len(parts) == 1 {
+		return stmt, nil
+	}
+	rest := make([]string, 0, len(parts)-1)
+	for _, p := range parts[1:] {
+		rest = append(rest, strings.TrimSpace(p))
+	}
+	return stmt, rest
 }
