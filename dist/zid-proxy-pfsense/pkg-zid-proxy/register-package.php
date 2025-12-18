@@ -70,7 +70,7 @@ $config['installedpackages']['package'] = array_values($config['installedpackage
 echo "Adding package entry...\n";
 $config['installedpackages']['package'][] = array(
     'name' => 'zid-proxy',
-    'version' => '1.0.10.5',
+    'version' => '1.0.10.8.1',
     'descr' => 'ZID Proxy - SNI-based transparent HTTPS filtering proxy',
     'website' => '',
     'configurationfile' => 'zid-proxy.xml',  // Correct tag (not config_file), no path

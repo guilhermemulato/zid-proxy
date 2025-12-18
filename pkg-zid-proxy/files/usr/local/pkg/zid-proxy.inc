@@ -23,6 +23,8 @@ define('ZIDPROXY_RCFILE', '/usr/local/etc/rc.d/zid-proxy.sh');
 define('ZIDPROXY_BINARY', '/usr/local/sbin/zid-proxy');
 define('ZIDPROXY_LOGROTATE_BINARY', '/usr/local/sbin/zid-proxy-logrotate');
 define('ZIDPROXY_LOGROTATE_CRON_DESCR', 'ZID Proxy: logrotate');
+define('ZIDPROXY_WATCHDOG_SH', '/usr/local/sbin/zid-proxy-watchdog');
+define('ZIDPROXY_WATCHDOG_CRON_DESCR', 'ZID Proxy: watchdog');
 
 function zidproxy_logrotate_cron_command($keep_days) {
 	$keep = is_numeric($keep_days) ? (int)$keep_days : 7;
@@ -41,6 +43,26 @@ function zidproxy_logrotate_cron_command($keep_days) {
 function zidproxy_configure_cron_compat() {
 	if (function_exists('configure_cron')) {
 		@configure_cron();
+	}
+}
+
+function zidproxy_config_lock_compat() {
+	if (function_exists('config_lock')) {
+		config_lock();
+		return;
+	}
+	if (function_exists('lock')) {
+		lock('config');
+	}
+}
+
+function zidproxy_config_unlock_compat() {
+	if (function_exists('config_unlock')) {
+		config_unlock();
+		return;
+	}
+	if (function_exists('unlock')) {
+		unlock('config');
 	}
 }
 
@@ -81,6 +103,73 @@ function zidproxy_cron_job_present($id_or_descr, $command = null) {
 	}
 
 	return false;
+}
+
+function zidproxy_remove_cron_jobs_where($predicate) {
+	global $config;
+	if (!is_array($config)) {
+		return false;
+	}
+
+	$changed = false;
+	foreach (['item', 'job'] as $key) {
+		if (!isset($config['cron'][$key]) || !is_array($config['cron'][$key])) {
+			continue;
+		}
+		$new = [];
+		foreach ($config['cron'][$key] as $job) {
+			if (!is_array($job)) {
+				continue;
+			}
+			$remove = false;
+			try {
+				$remove = (bool)call_user_func($predicate, $job);
+			} catch (Throwable $e) {
+				$remove = false;
+			}
+			if ($remove) {
+				$changed = true;
+				continue;
+			}
+			$new[] = $job;
+		}
+		if ($changed) {
+			$config['cron'][$key] = $new;
+		}
+	}
+
+	return $changed;
+}
+
+function zidproxy_remove_cron_job_by_descr($descr) {
+	zidproxy_config_lock_compat();
+	$changed = zidproxy_remove_cron_jobs_where(function ($job) use ($descr) {
+		return (string)($job['descr'] ?? '') === (string)$descr;
+	});
+	if ($changed) {
+		zidproxy_configure_cron_compat();
+		@write_config("ZID Proxy cron removed");
+	}
+	zidproxy_config_unlock_compat();
+	return $changed;
+}
+
+function zidproxy_remove_cron_jobs_by_command_substr($needle) {
+	$needle = (string)$needle;
+	if ($needle === '') {
+		return false;
+	}
+	zidproxy_config_lock_compat();
+	$changed = zidproxy_remove_cron_jobs_where(function ($job) use ($needle) {
+		$cmd = (string)($job['command'] ?? '');
+		return $cmd !== '' && strpos($cmd, $needle) !== false;
+	});
+	if ($changed) {
+		zidproxy_configure_cron_compat();
+		@write_config("ZID Proxy cron removed");
+	}
+	zidproxy_config_unlock_compat();
+	return $changed;
 }
 
 function zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command) {
@@ -143,7 +232,10 @@ function zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, 
 function zidproxy_install_cron_job_compat($minute, $hour, $mday, $month, $wday, $who, $command, $descr) {
 	if (!function_exists('install_cron_job')) {
 		// Fallback to a safe config upsert.
-		return zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command);
+		zidproxy_config_lock_compat();
+		$ok = zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command);
+		zidproxy_config_unlock_compat();
+		return $ok;
 	}
 
 	// pfSense has shipped multiple install_cron_job() signatures historically.
@@ -158,7 +250,9 @@ function zidproxy_install_cron_job_compat($minute, $hour, $mday, $month, $wday, 
 
 	foreach ($attempts as $args) {
 		// install_cron_job may emit warnings on signature mismatch; do best-effort suppress.
+		zidproxy_config_lock_compat();
 		@call_user_func_array('install_cron_job', $args);
+		zidproxy_config_unlock_compat();
 		if (zidproxy_cron_job_present($descr, $command)) {
 			zidproxy_configure_cron_compat();
 			@write_config("ZID Proxy cron updated");
@@ -167,7 +261,10 @@ function zidproxy_install_cron_job_compat($minute, $hour, $mday, $month, $wday, 
 	}
 
 	// If install_cron_job() didn't take, ensure it's present by updating config directly.
-	return zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command);
+	zidproxy_config_lock_compat();
+	$ok = zidproxy_upsert_cron_job($descr, $minute, $hour, $mday, $month, $wday, $who, $command);
+	zidproxy_config_unlock_compat();
+	return $ok;
 }
 
 function zidproxy_remove_cron_job_compat($id, $command = null) {
@@ -206,7 +303,8 @@ function zidproxy_remove_cron_job_compat($id, $command = null) {
 		} catch (Throwable $e) {}
 	}
 
-	return false;
+	// Fallback by descr (more reliable)
+	return zidproxy_remove_cron_job_by_descr($id);
 }
 
 function zidproxy_install_logrotate_cron() {
@@ -222,21 +320,85 @@ function zidproxy_install_logrotate_cron() {
 	}
 
 	$cmd = zidproxy_logrotate_cron_command($keep_days);
-	return zidproxy_install_cron_job_compat(
+	// Ensure we don't accumulate broken/duplicate cron entries from prior versions.
+	zidproxy_config_lock_compat();
+	zidproxy_remove_cron_jobs_where(function ($job) {
+		$descr = (string)($job['descr'] ?? '');
+		$command = (string)($job['command'] ?? '');
+		if ($descr === ZIDPROXY_LOGROTATE_CRON_DESCR) {
+			return true;
+		}
+		return $command !== '' && strpos($command, 'zid-proxy-logrotate') !== false;
+	});
+	$ok = zidproxy_upsert_cron_job(
+		ZIDPROXY_LOGROTATE_CRON_DESCR,
 		'0',  // minute
 		'*',  // hour
 		'*',  // mday
 		'*',  // month
 		'*',  // wday
 		'root',
-		$cmd,
-		ZIDPROXY_LOGROTATE_CRON_DESCR
+		$cmd
 	);
+	zidproxy_configure_cron_compat();
+	@write_config("ZID Proxy logrotate cron updated");
+	zidproxy_config_unlock_compat();
+	return $ok;
 }
 
 function zidproxy_remove_logrotate_cron() {
 	$cmd = zidproxy_logrotate_cron_command(7);
-	return zidproxy_remove_cron_job_compat(ZIDPROXY_LOGROTATE_CRON_DESCR, $cmd);
+	$removed = false;
+	$removed = zidproxy_remove_cron_job_compat(ZIDPROXY_LOGROTATE_CRON_DESCR, $cmd) || $removed;
+	$removed = zidproxy_remove_cron_jobs_by_command_substr('zid-proxy-logrotate') || $removed;
+	return $removed;
+}
+
+function zidproxy_watchdog_cron_command() {
+	// Use `sh -c` to ensure shell redirection works even if cron uses a different shell.
+	return sprintf(
+		'/bin/sh -c %s',
+		escapeshellarg(escapeshellcmd(ZIDPROXY_WATCHDOG_SH) . ' >/dev/null 2>&1')
+	);
+}
+
+function zidproxy_install_watchdog_cron() {
+	if (!file_exists(ZIDPROXY_WATCHDOG_SH)) {
+		zidproxy_remove_watchdog_cron();
+		return false;
+	}
+
+	$cmd = zidproxy_watchdog_cron_command();
+	// Some pfSense versions have an install_cron_job() signature that can misplace fields.
+	// For watchdog, always use a direct upsert into config to ensure correct columns.
+	zidproxy_config_lock_compat();
+	// Clean up any previously-created broken entries.
+	zidproxy_remove_cron_jobs_where(function ($job) {
+		$cmd = (string)($job['command'] ?? '');
+		return $cmd !== '' && strpos($cmd, 'zid-proxy-watchdog') !== false;
+	});
+	$ok = zidproxy_upsert_cron_job(
+		ZIDPROXY_WATCHDOG_CRON_DESCR,
+		'*', // minute
+		'*', // hour
+		'*', // mday
+		'*', // month
+		'*', // wday
+		'root',
+		$cmd
+	);
+	zidproxy_configure_cron_compat();
+	@write_config("ZID Proxy watchdog cron updated");
+	zidproxy_config_unlock_compat();
+	return $ok;
+}
+
+function zidproxy_remove_watchdog_cron() {
+	$cmd = zidproxy_watchdog_cron_command();
+	$removed = false;
+	$removed = zidproxy_remove_cron_job_compat(ZIDPROXY_WATCHDOG_CRON_DESCR, $cmd) || $removed;
+	$removed = zidproxy_remove_cron_jobs_by_command_substr('zid-proxy-watchdog') || $removed;
+	return $removed;
 }
 
 function zidproxy_get_rules_mode() {
@@ -403,6 +565,8 @@ function zidproxy_deinstall() {
 
 	// Remove logrotate cron
 	zidproxy_remove_logrotate_cron();
+	// Remove watchdog cron
+	zidproxy_remove_watchdog_cron();
 
 	// Remove rc.conf entries
 	unset_rcvar('zid_proxy_enable');
@@ -456,6 +620,13 @@ function zidproxy_resync() {
 
 	// Ensure hourly logrotate cron exists (idempotent) and reflects current retention settings.
 	zidproxy_install_logrotate_cron();
+
+	// Watchdog cron: only enabled when the service is enabled in Settings.
+	if (isset($zidproxy_config['enable']) && $zidproxy_config['enable'] === 'on') {
+		zidproxy_install_watchdog_cron();
+	} else {
+		zidproxy_remove_watchdog_cron();
+	}
 
 	if (isset($zidproxy_config['enable']) && $zidproxy_config['enable'] == 'on') {
 		// Get configuration values

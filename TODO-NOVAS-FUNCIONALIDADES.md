@@ -57,12 +57,12 @@
 - [x] Comando final do cron chama o `zid-proxy-logrotate` com os parametros corretos
 
 ### Fase 5 — Watchdog (cron + logica “so inicia se Enable=on”)
-- [ ] Implementar watchdog (script/PHP) que verifica `Enable` e o status do processo
-- [ ] Se `Enable=off`: watchdog nao inicia nada
-- [ ] Se `Enable=on` e servico parado: iniciar via rc.d
-- [ ] Criar cron do watchdog usando `install_cron_job()` (idempotente)
-- [ ] No `resync`: ativar/desativar o cron do watchdog conforme `Enable`
-- [ ] No `uninstall`: remover o cron do watchdog
+- [x] Implementar watchdog (script/PHP) que verifica `Enable` e o status do processo
+- [x] Se `Enable=off`: watchdog nao inicia nada
+- [x] Se `Enable=on` e servico parado: iniciar via rc.d
+- [x] Criar cron do watchdog usando `install_cron_job()` (idempotente)
+- [x] No `resync`: ativar/desativar o cron do watchdog conforme `Enable`
+- [x] No `uninstall`: remover o cron do watchdog
 
 ### Fase 6 — Release (pacote `latest` para SCP/update)
 - [x] Bump de versao (alteracao pequena: `1.0.9.1`, `1.0.9.2`, etc)

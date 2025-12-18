@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+PHP_BIN=""
+if [ -x /usr/local/bin/php ]; then
+	PHP_BIN="/usr/local/bin/php"
+elif command -v php >/dev/null 2>&1; then
+	PHP_BIN="$(command -v php)"
+elif [ -x /usr/local/bin/php-cgi ]; then
+	PHP_BIN="/usr/local/bin/php-cgi"
+fi
+
+if [ -z "${PHP_BIN}" ]; then
+	echo "ERROR: php not found" >&2
+	exit 2
+fi
+
+exec "${PHP_BIN}" -q /usr/local/pkg/zid-proxy_watchdog.php
+

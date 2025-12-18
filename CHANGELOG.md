@@ -2,6 +2,26 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
+## [1.0.10.7] - 2025-12-18
+
+### Added
+- Watchdog cron: monitors `zid-proxy` and starts it when `Enable=on`
+
+## [1.0.10.8] - 2025-12-18
+
+### Fixed
+- Watchdog cron: create job with correct column alignment on pfSense cron GUI
+
+## [1.0.10.8.1] - 2025-12-18
+
+### Fixed
+- Logrotate cron: remove duplicate/broken cron entries and keep only one correct job
+
+## [1.0.10.6] - 2025-12-18
+
+### Fixed
+- Cron install: ensures the cron `command` includes full args (prevents creating a job with only `zid-proxy-logrotate`)
+
 ## [1.0.10.5] - 2025-12-18
 
 ### Fixed

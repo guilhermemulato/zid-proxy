@@ -70,6 +70,7 @@ fi
 echo "Removing binary..."
 rm -f /usr/local/sbin/zid-proxy
 rm -f /usr/local/sbin/zid-proxy-logrotate
+rm -f /usr/local/sbin/zid-proxy-watchdog
 
 # Remove updater helper
 rm -f /usr/local/sbin/zid-proxy-update
@@ -78,6 +79,7 @@ rm -f /usr/local/sbin/zid-proxy-update
 echo "Removing package files..."
 rm -f /usr/local/pkg/zid-proxy.xml
 rm -f /usr/local/pkg/zid-proxy.inc
+rm -f /usr/local/pkg/zid-proxy_watchdog.php
 
 # Remove web interface files
 echo "Removing web interface files..."

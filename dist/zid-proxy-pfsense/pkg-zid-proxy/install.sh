@@ -44,6 +44,7 @@ mkdir -p /var/log
 echo "Installing package configuration..."
 cp ${FILES_DIR}${PREFIX}/pkg/zid-proxy.xml ${PREFIX}/pkg/
 cp ${FILES_DIR}${PREFIX}/pkg/zid-proxy.inc ${PREFIX}/pkg/
+cp ${FILES_DIR}${PREFIX}/pkg/zid-proxy_watchdog.php ${PREFIX}/pkg/ 2>/dev/null || true
 
 # Install web pages
 echo "Installing web pages..."
@@ -74,6 +75,15 @@ if [ -f "${PKG_DIR}/update-bootstrap.sh" ]; then
     cp "${PKG_DIR}/update-bootstrap.sh" "${TMP_UPDATER_INFO}"
     chmod 755 "${TMP_UPDATER_INFO}"
     mv -f "${TMP_UPDATER_INFO}" "${PREFIX}/share/pfSense-pkg-zid-proxy/zid-proxy-update"
+fi
+
+# Install watchdog helper (used by cron)
+if [ -f "${FILES_DIR}${PREFIX}/sbin/zid-proxy-watchdog" ]; then
+    echo "Installing watchdog helper..."
+    TMP_WD="${PREFIX}/sbin/.zid-proxy-watchdog.new.$$"
+    cp "${FILES_DIR}${PREFIX}/sbin/zid-proxy-watchdog" "${TMP_WD}"
+    chmod 755 "${TMP_WD}"
+    mv -f "${TMP_WD}" "${PREFIX}/sbin/zid-proxy-watchdog"
 fi
 
 # Check if binary exists in parent directory
@@ -130,6 +140,9 @@ chmod 644 /var/log/zid-proxy.log
 echo "Setting permissions..."
 chmod 644 ${PREFIX}/pkg/zid-proxy.xml
 chmod 644 ${PREFIX}/pkg/zid-proxy.inc
+if [ -f ${PREFIX}/pkg/zid-proxy_watchdog.php ]; then
+    chmod 644 ${PREFIX}/pkg/zid-proxy_watchdog.php
+fi
 chmod 644 ${PREFIX}/www/zid-proxy_settings.php
 chmod 644 ${PREFIX}/www/zid-proxy_rules.php
 chmod 644 ${PREFIX}/www/zid-proxy_log.php
