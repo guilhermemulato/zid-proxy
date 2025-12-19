@@ -21,6 +21,7 @@ if (zidproxy_get_rules_mode() === 'groups') {
 	$tab_array = array();
 	$tab_array[] = array(gettext("Settings"), false, "/zid-proxy_settings.php");
 	$tab_array[] = array(gettext("Active IPs"), false, "/zid-proxy_active_ips.php");
+	$tab_array[] = array(gettext("Agent"), false, "/zid-proxy_agent.php");
 	$tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 	$tab_array[] = array(gettext("Access Rules"), true, "/zid-proxy_rules.php");
 	$tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
@@ -113,6 +114,7 @@ include("head.inc");
 $tab_array = array();
 $tab_array[] = array(gettext("Settings"), false, "/zid-proxy_settings.php");
 $tab_array[] = array(gettext("Active IPs"), false, "/zid-proxy_active_ips.php");
+$tab_array[] = array(gettext("Agent"), false, "/zid-proxy_agent.php");
 $tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 $tab_array[] = array(gettext("Access Rules"), true, "/zid-proxy_rules.php");
 $tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");

@@ -33,13 +33,53 @@ if ($_POST['clear']) {
 // Get log entries
 $log_entries = zidproxy_get_log_entries(500);
 
+// Enrich log entries with live Agent info (only when IP is currently active)
+$agent_map = [];
+$active_json = ZIDPROXY_ACTIVE_IPS_JSON;
+if (file_exists($active_json)) {
+	$raw = @file_get_contents($active_json);
+	if ($raw !== false && trim($raw) !== '') {
+		$active = json_decode($raw, true);
+		if (is_array($active) && is_array($active['ips'] ?? null)) {
+			foreach (($active['ips'] ?? []) as $row) {
+				$ip = (string)($row['src_ip'] ?? '');
+				if ($ip === '') {
+					continue;
+				}
+				$agent_map[$ip] = [
+					'machine' => (string)($row['machine'] ?? ''),
+					'username' => (string)($row['username'] ?? ''),
+				];
+			}
+		}
+	}
+}
+
+if (!empty($agent_map) && is_array($log_entries)) {
+	foreach ($log_entries as &$entry) {
+		$ip = (string)($entry['source_ip'] ?? '');
+		if ($ip === '' || !isset($agent_map[$ip])) {
+			continue;
+		}
+		if (empty($entry['machine'])) {
+			$entry['machine'] = $agent_map[$ip]['machine'] ?? '';
+		}
+		if (empty($entry['username'])) {
+			$entry['username'] = $agent_map[$ip]['username'] ?? '';
+		}
+	}
+	unset($entry);
+}
+
 // Apply backend filter if provided (optional optimization)
 if (!empty($filter_term)) {
 	$log_entries = array_filter($log_entries, function($entry) use ($filter_term) {
 		$filter_lower = strtolower($filter_term);
 		return (strpos(strtolower($entry['source_ip']), $filter_lower) !== false) ||
 		       (strpos(strtolower($entry['hostname']), $filter_lower) !== false) ||
-		       (strpos(strtolower($entry['group'] ?? ''), $filter_lower) !== false);
+		       (strpos(strtolower($entry['group'] ?? ''), $filter_lower) !== false) ||
+		       (strpos(strtolower($entry['machine'] ?? ''), $filter_lower) !== false) ||
+		       (strpos(strtolower($entry['username'] ?? ''), $filter_lower) !== false);
 	});
 }
 
@@ -49,6 +89,7 @@ include("head.inc");
 $tab_array = array();
 $tab_array[] = array(gettext("Settings"), false, "/zid-proxy_settings.php");
 $tab_array[] = array(gettext("Active IPs"), false, "/zid-proxy_active_ips.php");
+$tab_array[] = array(gettext("Agent"), false, "/zid-proxy_agent.php");
 $tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 $tab_array[] = array(gettext("Access Rules"), false, "/zid-proxy_rules.php");
 $tab_array[] = array(gettext("Logs"), true, "/zid-proxy_log.php");
@@ -136,6 +177,8 @@ display_top_tabs($tab_array);
 					<tr>
 						<th style="width: 180px;"><?=gettext('Timestamp')?></th>
 						<th style="width: 140px;"><?=gettext('Source IP')?></th>
+						<th style="width: 160px;"><?=gettext('Machine')?></th>
+						<th style="width: 140px;"><?=gettext('User')?></th>
 						<th><?=gettext('Hostname')?></th>
 						<th style="width: 160px;"><?=gettext('Group')?></th>
 						<th style="width: 80px;"><?=gettext('Action')?></th>
@@ -160,6 +203,16 @@ if (!empty($log_entries)):
 					<tr>
 						<td><small><?=htmlspecialchars($timestamp_local)?></small></td>
 						<td><?=htmlspecialchars($entry['source_ip'])?></td>
+						<td>
+							<?php if (!empty($entry['machine'])): ?>
+								<span class="label label-primary"><?=htmlspecialchars($entry['machine'])?></span>
+							<?php endif; ?>
+						</td>
+						<td>
+							<?php if (!empty($entry['username'])): ?>
+								<span class="label label-success"><?=htmlspecialchars($entry['username'])?></span>
+							<?php endif; ?>
+						</td>
 						<td><?=htmlspecialchars($entry['hostname'])?></td>
 						<td>
 							<?php if (!empty($entry['group'])): ?>
@@ -175,7 +228,7 @@ if (!empty($log_entries)):
 else:
 ?>
 					<tr>
-						<td colspan="5" class="text-center">
+						<td colspan="7" class="text-center">
 							<?=gettext('No log entries found.')?>
 						</td>
 					</tr>

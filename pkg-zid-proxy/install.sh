@@ -53,6 +53,7 @@ cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_rules.php ${PREFIX}/www/
 cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_log.php ${PREFIX}/www/
 cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_groups.php ${PREFIX}/www/
 cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_active_ips.php ${PREFIX}/www/ 2>/dev/null || true
+cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_agent.php ${PREFIX}/www/ 2>/dev/null || true
 
 # Install privilege definitions
 echo "Installing privilege definitions..."
@@ -150,6 +151,9 @@ chmod 644 ${PREFIX}/www/zid-proxy_log.php
 chmod 644 ${PREFIX}/www/zid-proxy_groups.php
 if [ -f ${PREFIX}/www/zid-proxy_active_ips.php ]; then
     chmod 644 ${PREFIX}/www/zid-proxy_active_ips.php
+fi
+if [ -f ${PREFIX}/www/zid-proxy_agent.php ]; then
+    chmod 644 ${PREFIX}/www/zid-proxy_agent.php
 fi
 chmod 644 /etc/inc/priv/zid-proxy.priv.inc
 

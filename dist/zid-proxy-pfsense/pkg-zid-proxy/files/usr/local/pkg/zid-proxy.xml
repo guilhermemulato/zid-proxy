@@ -43,6 +43,10 @@
 			<url>/zid-proxy_active_ips.php</url>
 		</tab>
 		<tab>
+			<text>Agent</text>
+			<url>/zid-proxy_agent.php</url>
+		</tab>
+		<tab>
 			<text>Groups</text>
 			<url>/zid-proxy_groups.php</url>
 		</tab>

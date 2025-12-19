@@ -429,6 +429,9 @@ function zidproxy_ensure_config_defaults() {
 		'enable' => 'off',
 		'interface' => 'all',
 		'listen_port' => '3129',
+		'agent_interface' => 'lan',
+		'agent_listen_port' => '18443',
+		'agent_ttl_seconds' => '120',
 		'timeout' => '30',
 		'enable_logging' => 'on',
 		'rules_mode' => 'legacy',
@@ -574,6 +577,8 @@ function zidproxy_deinstall() {
 	// Remove rc.conf entries
 	unset_rcvar('zid_proxy_enable');
 	unset_rcvar('zid_proxy_listen');
+	unset_rcvar('zid_proxy_agent_listen');
+	unset_rcvar('zid_proxy_agent_ttl_seconds');
 
 	return true;
 }
@@ -585,6 +590,18 @@ function zidproxy_validate($post, &$input_errors) {
 	if (!empty($post['listen_port'])) {
 		if (!is_port($post['listen_port'])) {
 			$input_errors[] = "Listen port must be a valid port number (1-65535).";
+		}
+	}
+
+	if (!empty($post['agent_listen_port'])) {
+		if (!is_port($post['agent_listen_port'])) {
+			$input_errors[] = "Agent listen port must be a valid port number (1-65535).";
+		}
+	}
+
+	if (!empty($post['agent_ttl_seconds'])) {
+		if (!is_numeric($post['agent_ttl_seconds']) || $post['agent_ttl_seconds'] < 30 || $post['agent_ttl_seconds'] > 86400) {
+			$input_errors[] = "Agent TTL must be a number between 30 and 86400 seconds.";
 		}
 	}
 
@@ -674,10 +691,35 @@ function zidproxy_resync() {
 		set_rcvar('zid_proxy_active_ips_timeout_seconds', $active_ips_timeout);
 		set_rcvar('zid_proxy_active_ips_interval_seconds', $active_ips_refresh);
 
+		// Agent HTTP API listener (used by desktop agents on LAN).
+		$agent_if = $zidproxy_config['agent_interface'] ?? 'lan';
+		$agent_port = $zidproxy_config['agent_listen_port'] ?? '18443';
+		$agent_ttl = $zidproxy_config['agent_ttl_seconds'] ?? '120';
+		$agent_listen = '';
+		if (!empty($agent_port) && is_port($agent_port)) {
+			if ($agent_if == 'all') {
+				$agent_listen = "0.0.0.0:{$agent_port}";
+			} else {
+				$agent_ip = get_interface_ip($agent_if);
+				if (empty($agent_ip)) {
+					$agent_ip = '0.0.0.0';
+				}
+				$agent_listen = "{$agent_ip}:{$agent_port}";
+			}
+		}
+		set_rcvar('zid_proxy_agent_listen', $agent_listen);
+		if (!empty($agent_ttl) && is_numeric($agent_ttl)) {
+			set_rcvar('zid_proxy_agent_ttl_seconds', $agent_ttl);
+		} else {
+			set_rcvar('zid_proxy_agent_ttl_seconds', '120');
+		}
+
 		// Start or restart service
 		zidproxy_start();
 	} else {
 		set_rcvar('zid_proxy_enable', 'NO');
+		set_rcvar('zid_proxy_agent_listen', '');
+		set_rcvar('zid_proxy_agent_ttl_seconds', '120');
 		zidproxy_stop();
 	}
 
@@ -952,16 +994,29 @@ function zidproxy_get_log_entries($lines = 200) {
 		}
 
 		// Parse:
+		// - Newest: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION | MACHINE | USER
 		// - New: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION
 		// - Old: TIMESTAMP | SOURCE_IP | HOSTNAME | ACTION
 		$parts = array_map('trim', explode('|', $line));
-		if (count($parts) >= 5) {
+		if (count($parts) >= 7) {
 			$entries[] = [
 				'timestamp' => $parts[0],
 				'source_ip' => $parts[1],
 				'hostname' => $parts[2],
 				'group' => $parts[3],
-				'action' => $parts[4]
+				'action' => $parts[4],
+				'machine' => $parts[5],
+				'username' => $parts[6],
+			];
+		} elseif (count($parts) >= 5) {
+			$entries[] = [
+				'timestamp' => $parts[0],
+				'source_ip' => $parts[1],
+				'hostname' => $parts[2],
+				'group' => $parts[3],
+				'action' => $parts[4],
+				'machine' => '',
+				'username' => '',
 			];
 		} elseif (count($parts) >= 4) {
 			$entries[] = [
@@ -969,7 +1024,9 @@ function zidproxy_get_log_entries($lines = 200) {
 				'source_ip' => $parts[1],
 				'hostname' => $parts[2],
 				'group' => '',
-				'action' => $parts[3]
+				'action' => $parts[3],
+				'machine' => '',
+				'username' => '',
 			];
 		}
 	}
@@ -1010,11 +1067,19 @@ load_rc_config $name
 	: ${zid_proxy_active_ips_json:="/var/run/zid-proxy.active_ips.json"}
 	: ${zid_proxy_active_ips_timeout_seconds:="120"}
 	: ${zid_proxy_active_ips_interval_seconds:="5"}
+	: ${zid_proxy_agent_listen:=""}
+	: ${zid_proxy_agent_ttl_seconds:="120"}
 
 pidfile="${zid_proxy_pid}"
 procname="/usr/local/sbin/zid-proxy"
 command="/usr/sbin/daemon"
-	command_args="-f -p ${pidfile} ${procname} -listen ${zid_proxy_listen} -rules ${zid_proxy_rules} -log ${zid_proxy_log} -pid ${zid_proxy_pid} -active-ips ${zid_proxy_active_ips_json} -active-ips-timeout-seconds ${zid_proxy_active_ips_timeout_seconds} -active-ips-interval-seconds ${zid_proxy_active_ips_interval_seconds}"
+
+agent_listen_arg=""
+if [ -n "${zid_proxy_agent_listen}" ]; then
+	agent_listen_arg="-agent-listen ${zid_proxy_agent_listen} -agent-ttl-seconds ${zid_proxy_agent_ttl_seconds}"
+fi
+
+	command_args="-f -p ${pidfile} ${procname} -listen ${zid_proxy_listen} -rules ${zid_proxy_rules} -log ${zid_proxy_log} -pid ${zid_proxy_pid} -active-ips ${zid_proxy_active_ips_json} -active-ips-timeout-seconds ${zid_proxy_active_ips_timeout_seconds} -active-ips-interval-seconds ${zid_proxy_active_ips_interval_seconds} ${agent_listen_arg}"
 
 start_precmd="zid_proxy_prestart"
 stop_postcmd="zid_proxy_poststop"

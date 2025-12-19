@@ -78,7 +78,15 @@ func (h *Handler) Handle() {
 	}
 
 	// Log the connection
-	h.server.logger.LogConnection(clientIP.String(), hostname, groupName, logAction)
+	machine := ""
+	username := ""
+	if h.server.agents != nil {
+		if m, u, ok := h.server.agents.Lookup(srcIP, time.Now()); ok {
+			machine = m
+			username = u
+		}
+	}
+	h.server.logger.LogConnection(clientIP.String(), hostname, groupName, machine, username, logAction)
 
 	if matched {
 		log.Printf("%s | %s -> %s | %s (matched rule)", clientIP, hostname, action, logAction)

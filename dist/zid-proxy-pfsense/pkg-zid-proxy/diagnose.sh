@@ -73,6 +73,7 @@ check_file "/usr/local/pkg/zid-proxy.xml" "Package XML manifest"
 check_file "/usr/local/pkg/zid-proxy.inc" "Package PHP functions"
 check_file "/usr/local/www/zid-proxy_rules.php" "Rules management page"
 check_file "/usr/local/www/zid-proxy_log.php" "Log viewer page"
+check_file "/usr/local/www/zid-proxy_agent.php" "Agent settings page"
 check_file "/etc/inc/priv/zid-proxy.priv.inc" "Privilege definitions"
 check_file "/usr/local/share/pfSense-pkg-zid-proxy/info.xml" "Package info"
 

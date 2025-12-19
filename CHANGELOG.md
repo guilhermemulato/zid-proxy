@@ -2,20 +2,60 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
-## [1.0.11] - 2025-12-18
+## [1.0.11.3] - 2025-12-19
 
 ### Added
-- Active IPs tracking (aggregated by source IP) with pfSense tab and configurable timeout/refresh
+- Agent HTTP API (LAN) to map source IP to machine/user
+- New pfSense tab: Agent (listener interface/port configuration)
+
+### Changed
+- Logs: append optional `| MACHINE | USER` fields (empty when not available)
+- Active IPs tab: display Machine/User when available
+
+## [1.0.11.3.1] - 2025-12-19
+
+### Changed
+- Packaging: split bundles into separate `latest` tarballs (pfSense, agent Linux, agent Windows)
+
+## [1.0.11.3.2] - 2025-12-19
+
+### Fixed
+- pfSense update/install scripts: ensure `/usr/local/www/zid-proxy_agent.php` is installed (Agent tab no longer 404)
+
+## [1.0.11.3.2.1] - 2025-12-19
+
+### Fixed
+- pfSense Agent tab: remove duplicated Save button
+
+## [1.0.11.3.2.2] - 2025-12-19
+
+### Fixed
+- Active IPs: persist agent machine/user mapping in snapshot to avoid flicker between refreshes
+
+## [1.0.11.3.2.3] - 2025-12-19
+
+### Added
+- Logs tab: show Machine/User badges when the source IP is currently active (from Active IPs snapshot)
+
+## [1.0.11.3.2.4] - 2025-12-19
+
+### Added
+- Agent identity TTL: clear Machine/User after X seconds without heartbeat (configurable on Agent tab)
+
+## [1.0.11.2] - 2025-12-18
+
+### Changed
+- Active IPs: Last Activity now displayed in `America/Sao_Paulo` timezone
 
 ## [1.0.11.1] - 2025-12-18
 
 ### Changed
 - Active IPs: `Bytes Out` now represents client upload (client -> upstream) and accumulates until the IP times out
 
-## [1.0.11.2] - 2025-12-18
+## [1.0.11] - 2025-12-18
 
-### Changed
-- Active IPs: Last Activity now displayed in `America/Sao_Paulo` timezone
+### Added
+- Active IPs tracking (aggregated by source IP) with pfSense tab and configurable timeout/refresh
 
 ## [1.0.10.7] - 2025-12-18
 

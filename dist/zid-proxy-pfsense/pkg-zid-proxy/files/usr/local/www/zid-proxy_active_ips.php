@@ -76,6 +76,7 @@ include("head.inc");
 $tab_array = array();
 $tab_array[] = array(gettext("Settings"), false, "/zid-proxy_settings.php");
 $tab_array[] = array(gettext("Active IPs"), true, "/zid-proxy_active_ips.php");
+$tab_array[] = array(gettext("Agent"), false, "/zid-proxy_agent.php");
 $tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 $tab_array[] = array(gettext("Access Rules"), false, "/zid-proxy_rules.php");
 $tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
@@ -112,6 +113,8 @@ display_top_tabs($tab_array);
 					<thead>
 					<tr>
 						<th><?=gettext('IP')?></th>
+						<th><?=gettext('Machine')?></th>
+						<th><?=gettext('User')?></th>
 						<th><?=gettext('Last Activity')?></th>
 						<th><?=gettext('Idle')?></th>
 						<th><?=gettext('Bytes Total')?></th>
@@ -124,6 +127,8 @@ display_top_tabs($tab_array);
 					<?php foreach (($data['ips'] ?? []) as $row): ?>
 						<tr>
 							<td><code><?=htmlspecialchars((string)($row['src_ip'] ?? ''))?></code></td>
+							<td><?=htmlspecialchars((string)($row['machine'] ?? ''))?></td>
+							<td><?=htmlspecialchars((string)($row['username'] ?? ''))?></td>
 							<td><?=htmlspecialchars(zidproxy_format_local_time($row['last_activity'] ?? ''))?></td>
 							<td>
 								<?php if (isset($row['idle_seconds'])): ?>

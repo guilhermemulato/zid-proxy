@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/guilherme/zid-proxy/internal/activeips"
+	"github.com/guilherme/zid-proxy/internal/agent"
+	"github.com/guilherme/zid-proxy/internal/agenthttp"
 	"github.com/guilherme/zid-proxy/internal/config"
 	"github.com/guilherme/zid-proxy/internal/logger"
 	"github.com/guilherme/zid-proxy/internal/proxy"
@@ -33,6 +37,8 @@ func main() {
 	activeIPsIntervalSec := flag.Int("active-ips-interval-seconds", int(cfg.ActiveIPsInterval.Seconds()), "How often to write active IPs snapshot (seconds)")
 	activeIPsTimeoutSec := flag.Int("active-ips-timeout-seconds", int(cfg.ActiveIPsTimeout.Seconds()), "Idle timeout to drop IPs from snapshot (seconds)")
 	flag.IntVar(&cfg.ActiveIPsMax, "active-ips-max", cfg.ActiveIPsMax, "Maximum number of tracked IPs")
+	flag.StringVar(&cfg.AgentListenAddr, "agent-listen", cfg.AgentListenAddr, "Agent HTTP API listen address (e.g., 192.168.1.1:18443). Empty disables.")
+	agentTTLSeconds := flag.Int("agent-ttl-seconds", int(cfg.AgentTTL.Seconds()), "Agent entry TTL (seconds)")
 	showVersion := flag.Bool("version", false, "Show version and exit")
 	flag.Parse()
 
@@ -44,6 +50,10 @@ func main() {
 	}
 	cfg.ActiveIPsInterval = time.Duration(*activeIPsIntervalSec) * time.Second
 	cfg.ActiveIPsTimeout = time.Duration(*activeIPsTimeoutSec) * time.Second
+	if *agentTTLSeconds < 30 {
+		*agentTTLSeconds = 30
+	}
+	cfg.AgentTTL = time.Duration(*agentTTLSeconds) * time.Second
 
 	if *showVersion {
 		fmt.Printf("zid-proxy version %s (built %s)\n", Version, BuildTime)
@@ -51,7 +61,7 @@ func main() {
 	}
 
 	log.Printf("zid-proxy version %s starting...", Version)
-	log.Printf("Configuration: listen=%s rules=%s log=%s", cfg.ListenAddr, cfg.RulesFile, cfg.LogFile)
+	log.Printf("Configuration: listen=%s rules=%s log=%s agent_listen=%s", cfg.ListenAddr, cfg.RulesFile, cfg.LogFile, cfg.AgentListenAddr)
 
 	// Write PID file
 	if err := writePidFile(cfg.PidFile); err != nil {
@@ -80,7 +90,10 @@ func main() {
 	activeTracker := activeips.New(activeips.Options{
 		IdleTimeout: cfg.ActiveIPsTimeout,
 		MaxIPs:      cfg.ActiveIPsMax,
+		IdentityTTL: cfg.AgentTTL,
 	})
+
+	agentRegistry := agent.NewRegistry(cfg.AgentTTL)
 
 	// Periodically write snapshot to JSON (and GC idle entries)
 	activeDone := make(chan struct{})
@@ -92,6 +105,7 @@ func main() {
 			case <-ticker.C:
 				now := time.Now()
 				activeTracker.GC(now)
+				agentRegistry.GC(now)
 				snap := activeTracker.Snapshot(now)
 				if err := activeips.WriteSnapshotAtomic(cfg.ActiveIPsFile, snap); err != nil {
 					log.Printf("Warning: failed to write active IPs snapshot: %v", err)
@@ -103,12 +117,34 @@ func main() {
 	}()
 	defer close(activeDone)
 
+	var agentSrv *http.Server
+	agentHTTPDone := make(chan struct{})
+	if cfg.AgentListenAddr != "" {
+		agentSrv = &http.Server{
+			Addr: cfg.AgentListenAddr,
+			Handler: agenthttp.New(agentRegistry, func(srcIP, machine, username string) {
+				activeTracker.SetIdentity(srcIP, machine, username, time.Now())
+			}).Handler(),
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		go func() {
+			defer close(agentHTTPDone)
+			log.Printf("Agent HTTP API listening on %s", cfg.AgentListenAddr)
+			if err := agentSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("Agent HTTP API error: %v", err)
+			}
+		}()
+	} else {
+		close(agentHTTPDone)
+	}
+
 	// Create proxy server
 	proxyCfg := proxy.Config{
 		ListenAddr:   cfg.ListenAddr,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 		ActiveIPs:    activeTracker,
+		Agents:       agentRegistry,
 	}
 	server := proxy.New(proxyCfg, ruleSet, accessLogger)
 
@@ -137,6 +173,12 @@ func main() {
 			if err := server.Stop(); err != nil {
 				log.Printf("Error during shutdown: %v", err)
 			}
+			if agentSrv != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				_ = agentSrv.Shutdown(ctx)
+				cancel()
+			}
+			<-agentHTTPDone
 			log.Println("Goodbye!")
 			return
 		}

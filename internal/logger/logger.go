@@ -24,6 +24,8 @@ type Entry struct {
 	Hostname  string
 	Group     string
 	Action    Action
+	Machine   string
+	Username  string
 }
 
 // Logger handles structured logging to a file
@@ -53,26 +55,30 @@ func (l *Logger) Log(entry Entry) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Format: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION
-	line := fmt.Sprintf("%s | %s | %s | %s | %s\n",
+	// Format: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION | MACHINE | USER
+	line := fmt.Sprintf("%s | %s | %s | %s | %s | %s | %s\n",
 		entry.Timestamp.Format(time.RFC3339),
 		entry.SourceIP,
 		entry.Hostname,
 		entry.Group,
 		entry.Action,
+		entry.Machine,
+		entry.Username,
 	)
 
 	l.writer.WriteString(line)
 }
 
 // LogConnection is a convenience method to log a connection
-func (l *Logger) LogConnection(srcIP, hostname, group string, action Action) {
+func (l *Logger) LogConnection(srcIP, hostname, group, machine, username string, action Action) {
 	l.Log(Entry{
 		Timestamp: time.Now(),
 		SourceIP:  srcIP,
 		Hostname:  hostname,
 		Group:     group,
 		Action:    action,
+		Machine:   machine,
+		Username:  username,
 	})
 }
 
@@ -138,15 +144,16 @@ func NewNullLogger() *NullLogger {
 	return &NullLogger{}
 }
 
-func (l *NullLogger) Log(entry Entry)                                {}
-func (l *NullLogger) LogConnection(srcIP, hostname, group string, action Action) {}
-func (l *NullLogger) Flush() error                                   { return nil }
-func (l *NullLogger) Close() error                                   { return nil }
+func (l *NullLogger) Log(entry Entry) {}
+func (l *NullLogger) LogConnection(srcIP, hostname, group, machine, username string, action Action) {
+}
+func (l *NullLogger) Flush() error { return nil }
+func (l *NullLogger) Close() error { return nil }
 
 // Interface defines the logger interface for dependency injection
 type Interface interface {
 	Log(entry Entry)
-	LogConnection(srcIP, hostname, group string, action Action)
+	LogConnection(srcIP, hostname, group, machine, username string, action Action)
 	Flush() error
 	Close() error
 }
@@ -170,23 +177,27 @@ func (l *WriterLogger) Log(entry Entry) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	line := fmt.Sprintf("%s | %s | %s | %s | %s\n",
+	line := fmt.Sprintf("%s | %s | %s | %s | %s | %s | %s\n",
 		entry.Timestamp.Format(time.RFC3339),
 		entry.SourceIP,
 		entry.Hostname,
 		entry.Group,
 		entry.Action,
+		entry.Machine,
+		entry.Username,
 	)
 	l.writer.Write([]byte(line))
 }
 
-func (l *WriterLogger) LogConnection(srcIP, hostname, group string, action Action) {
+func (l *WriterLogger) LogConnection(srcIP, hostname, group, machine, username string, action Action) {
 	l.Log(Entry{
 		Timestamp: time.Now(),
 		SourceIP:  srcIP,
 		Hostname:  hostname,
 		Group:     group,
 		Action:    action,
+		Machine:   machine,
+		Username:  username,
 	})
 }
 

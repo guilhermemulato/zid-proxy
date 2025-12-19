@@ -24,12 +24,14 @@ func Run(opts Options) (bool, error) {
 		opts.Now = time.Now()
 	}
 
-	if err := ensureFile(opts.LogPath); err != nil {
-		return false, err
-	}
-
 	info, err := os.Stat(opts.LogPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			if err := ensureFile(opts.LogPath); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
 		return false, fmt.Errorf("stat log file: %w", err)
 	}
 
@@ -92,4 +94,3 @@ func rotateNumeric(logPath string, keepDays int) error {
 
 	return nil
 }
-

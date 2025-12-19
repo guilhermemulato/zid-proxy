@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/guilherme/zid-proxy/internal/activeips"
+	"github.com/guilherme/zid-proxy/internal/agent"
 	"github.com/guilherme/zid-proxy/internal/logger"
 	"github.com/guilherme/zid-proxy/internal/rules"
 )
@@ -19,6 +20,7 @@ type Config struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	ActiveIPs    *activeips.Tracker
+	Agents       *agent.Registry
 }
 
 // DefaultConfig returns a Config with sensible defaults
@@ -28,6 +30,7 @@ func DefaultConfig() Config {
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		ActiveIPs:    nil,
+		Agents:       nil,
 	}
 }
 
@@ -37,6 +40,7 @@ type Server struct {
 	rules    *rules.RuleSet
 	logger   logger.Interface
 	listener net.Listener
+	agents   *agent.Registry
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -50,6 +54,7 @@ func New(cfg Config, ruleSet *rules.RuleSet, log logger.Interface) *Server {
 		config: cfg,
 		rules:  ruleSet,
 		logger: log,
+		agents: cfg.Agents,
 		ctx:    ctx,
 		cancel: cancel,
 	}

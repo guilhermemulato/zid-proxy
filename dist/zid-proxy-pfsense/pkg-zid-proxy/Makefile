@@ -39,9 +39,17 @@ do-install:
 		${STAGEDIR}${PREFIX}/pkg
 
 	# Install web pages
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/zid-proxy_settings.php \
+		${STAGEDIR}${PREFIX}/www
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/zid-proxy_rules.php \
 		${STAGEDIR}${PREFIX}/www
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/zid-proxy_log.php \
+		${STAGEDIR}${PREFIX}/www
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/zid-proxy_groups.php \
+		${STAGEDIR}${PREFIX}/www
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/zid-proxy_active_ips.php \
+		${STAGEDIR}${PREFIX}/www
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/zid-proxy_agent.php \
 		${STAGEDIR}${PREFIX}/www
 
 	# Install privilege definitions

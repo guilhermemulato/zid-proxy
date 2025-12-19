@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,6 +20,7 @@ type Tracker struct {
 type Options struct {
 	IdleTimeout time.Duration
 	MaxIPs      int
+	IdentityTTL time.Duration
 }
 
 type ipStats struct {
@@ -28,6 +30,9 @@ type ipStats struct {
 	BytesIn      uint64
 	BytesOut     uint64
 	ActiveConns  int
+	Machine      string
+	Username     string
+	IdentitySeen time.Time
 }
 
 type Snapshot struct {
@@ -39,6 +44,8 @@ type Snapshot struct {
 
 type IPSnapshot struct {
 	SrcIP        string `json:"src_ip"`
+	Machine      string `json:"machine,omitempty"`
+	Username     string `json:"username,omitempty"`
 	FirstSeen    string `json:"first_seen"`
 	LastActivity string `json:"last_activity"`
 	IdleSeconds  int    `json:"idle_seconds"`
@@ -55,6 +62,9 @@ func New(opts Options) *Tracker {
 	if opts.MaxIPs <= 0 {
 		opts.MaxIPs = 5000
 	}
+	if opts.IdentityTTL < 0 {
+		opts.IdentityTTL = 0
+	}
 	return &Tracker{
 		ips:  make(map[string]*ipStats),
 		opts: opts,
@@ -67,6 +77,23 @@ func normalizeSrcIP(srcIP string) string {
 		return ""
 	}
 	return srcIP
+}
+
+func sanitizeIdentityField(s string) string {
+	if s == "" {
+		return ""
+	}
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			continue
+		}
+		out = append(out, r)
+		if len(out) >= 128 {
+			break
+		}
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func (t *Tracker) ConnStart(srcIP string, now time.Time) {
@@ -136,6 +163,34 @@ func (t *Tracker) AddBytes(srcIP string, bytesIn, bytesOut uint64, now time.Time
 	}
 }
 
+// SetIdentity updates machine/user for an already-tracked IP.
+// It intentionally does not create a new tracked IP entry (Active IPs list is traffic-based).
+func (t *Tracker) SetIdentity(srcIP, machine, username string, now time.Time) {
+	srcIP = normalizeSrcIP(srcIP)
+	if srcIP == "" {
+		return
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	s := t.ips[srcIP]
+	if s == nil {
+		return
+	}
+	machine = sanitizeIdentityField(machine)
+	username = sanitizeIdentityField(username)
+	if machine != "" {
+		s.Machine = machine
+	}
+	if username != "" {
+		s.Username = username
+	}
+	if !now.IsZero() {
+		s.IdentitySeen = now
+	}
+}
+
 func (t *Tracker) GC(now time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -179,6 +234,13 @@ func (t *Tracker) Snapshot(now time.Time) Snapshot {
 		IPs:            make([]IPSnapshot, 0, len(t.ips)),
 	}
 	for _, s := range t.ips {
+		if t.opts.IdentityTTL > 0 {
+			if s.IdentitySeen.IsZero() || now.Sub(s.IdentitySeen) > t.opts.IdentityTTL {
+				s.Machine = ""
+				s.Username = ""
+			}
+		}
+
 		idle := int(now.Sub(s.LastActivity).Seconds())
 		if idle < 0 {
 			idle = 0
@@ -186,6 +248,8 @@ func (t *Tracker) Snapshot(now time.Time) Snapshot {
 		total := s.BytesIn + s.BytesOut
 		out.IPs = append(out.IPs, IPSnapshot{
 			SrcIP:        s.SrcIP,
+			Machine:      s.Machine,
+			Username:     s.Username,
 			FirstSeen:    s.FirstSeen.UTC().Format(time.RFC3339),
 			LastActivity: s.LastActivity.UTC().Format(time.RFC3339),
 			IdleSeconds:  idle,

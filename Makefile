@@ -2,7 +2,8 @@
 
 BINARY=zid-proxy
 LOGROTATE_BINARY=zid-proxy-logrotate
-VERSION=1.0.11.2
+AGENT_BINARY=zid-agent
+VERSION=1.0.11.3.2.4
 BUILD_DIR=build
 LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION)"
 
@@ -23,10 +24,17 @@ all: test build-freebsd
 build:
 	$(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/zid-proxy
 	$(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(LOGROTATE_BINARY) ./cmd/zid-proxy-logrotate
+	$(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(AGENT_BINARY) ./cmd/zid-agent
 
 build-freebsd:
 	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/zid-proxy
 	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(LOGROTATE_BINARY) ./cmd/zid-proxy-logrotate
+
+build-agent-linux:
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(AGENT_BINARY)-linux-amd64 ./cmd/zid-agent
+
+build-agent-windows:
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(AGENT_BINARY)-windows-amd64.exe ./cmd/zid-agent
 
 test:
 	$(GO) test -v ./...
@@ -42,6 +50,6 @@ install: build-freebsd
 run:
 	$(GO) run ./cmd/zid-proxy -listen :8443 -rules configs/access_rules.txt -log /tmp/zid-proxy.log
 
-bundle-latest: build-freebsd
+bundle-latest: build-freebsd build-agent-linux build-agent-windows
 	chmod +x scripts/bundle-latest.sh
 	./scripts/bundle-latest.sh

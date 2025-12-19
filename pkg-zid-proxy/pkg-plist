@@ -8,5 +8,6 @@
 %%PREFIX%%/www/zid-proxy_log.php
 %%PREFIX%%/www/zid-proxy_groups.php
 %%PREFIX%%/www/zid-proxy_active_ips.php
+%%PREFIX%%/www/zid-proxy_agent.php
 %%DATADIR%%/info.xml
 @dir %%PREFIX%%/etc/zid-proxy

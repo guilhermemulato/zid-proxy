@@ -88,6 +88,7 @@ rm -f /usr/local/www/zid-proxy_rules.php
 rm -f /usr/local/www/zid-proxy_log.php
 rm -f /usr/local/www/zid-proxy_groups.php
 rm -f /usr/local/www/zid-proxy_active_ips.php
+rm -f /usr/local/www/zid-proxy_agent.php
 
 # Remove privilege definitions
 echo "Removing privilege definitions..."

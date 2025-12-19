@@ -43,3 +43,35 @@ func TestTracker_GC_RemovesIdle(t *testing.T) {
 		t.Fatalf("got %d ips, want 0", len(snap.IPs))
 	}
 }
+
+func TestTracker_SetIdentity_PersistsInSnapshot(t *testing.T) {
+	tr := New(Options{IdleTimeout: 10 * time.Second, MaxIPs: 100})
+	now := time.Unix(1000, 0).UTC()
+
+	tr.AddBytes("192.168.1.10", 1, 1, now)
+	tr.SetIdentity("192.168.1.10", "pc-01", "alice", now)
+
+	snap := tr.Snapshot(now.Add(1 * time.Second))
+	if len(snap.IPs) != 1 {
+		t.Fatalf("got %d ips, want 1", len(snap.IPs))
+	}
+	if snap.IPs[0].Machine != "pc-01" || snap.IPs[0].Username != "alice" {
+		t.Fatalf("machine/user=%q/%q", snap.IPs[0].Machine, snap.IPs[0].Username)
+	}
+}
+
+func TestTracker_IdentityTTL_ClearsAfterTimeout(t *testing.T) {
+	tr := New(Options{IdleTimeout: 10 * time.Second, MaxIPs: 100, IdentityTTL: 2 * time.Second})
+	now := time.Unix(1000, 0).UTC()
+
+	tr.AddBytes("192.168.1.10", 1, 1, now)
+	tr.SetIdentity("192.168.1.10", "pc-01", "alice", now)
+
+	snap := tr.Snapshot(now.Add(3 * time.Second))
+	if len(snap.IPs) != 1 {
+		t.Fatalf("got %d ips, want 1", len(snap.IPs))
+	}
+	if snap.IPs[0].Machine != "" || snap.IPs[0].Username != "" {
+		t.Fatalf("expected identity cleared, got %q/%q", snap.IPs[0].Machine, snap.IPs[0].Username)
+	}
+}

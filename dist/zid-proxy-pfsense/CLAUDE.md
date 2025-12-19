@@ -110,6 +110,8 @@ scripts/rc.d/zid-proxy     # FreeBSD service script
 
   ## Specs
 - Sempre ao final, se necessario gere novamente os binarios e compacte todos os arquivos em um tar com a versao latest, para facilitar o scp
+- Separe sempre os bundle dos binarios, um para zid-proxy, um para agente windows e outro para o agente linux
 - Sempre apos alguma alteracao nos codigo registro o que foi alterado no CHANGELOG.md, criando uma nova versao na sequencia
 - Caso seja uma alteracao bem pequena, so adicione um numero na versao, Tipo 1.0.8.1
 - Deixe algum arquivo ou algum lugar salvo com a versao atual, para que quando o update.sh for executado no cliente, ele consiga comparar se é a mesma versao, caso seja significa que ja esta atualizado, e para o processo de update
+- 

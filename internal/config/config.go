@@ -30,6 +30,11 @@ type Config struct {
 	ActiveIPsTimeout time.Duration
 	// ActiveIPsMax caps the number of tracked IPs
 	ActiveIPsMax int
+
+	// AgentListenAddr enables the agent HTTP API listener when non-empty (e.g. "192.168.1.1:18443")
+	AgentListenAddr string
+	// AgentTTL removes agent entries after this idle time (no heartbeat)
+	AgentTTL time.Duration
 }
 
 // Default returns a Config with default values
@@ -45,5 +50,7 @@ func Default() *Config {
 		ActiveIPsInterval: 2 * time.Second,
 		ActiveIPsTimeout:  120 * time.Second,
 		ActiveIPsMax:      5000,
+		AgentListenAddr:   "",
+		AgentTTL:          120 * time.Second,
 	}
 }
