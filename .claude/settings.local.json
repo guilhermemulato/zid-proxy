@@ -11,7 +11,9 @@
       "Bash(configs/access_rules.txt )",
       "Bash(README.md )",
       "Bash(CLAUDE.md )",
-      "Bash(INSTALL-PFSENSE.md )"
+      "Bash(INSTALL-PFSENSE.md )",
+      "Bash(make build-agent-linux:*)",
+      "Bash(make build-agent-windows:*)"
     ]
   }
 }

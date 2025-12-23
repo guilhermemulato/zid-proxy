@@ -431,12 +431,12 @@ function zidproxy_ensure_config_defaults() {
 		'listen_port' => '3129',
 		'agent_interface' => 'lan',
 		'agent_listen_port' => '18443',
-		'agent_ttl_seconds' => '120',
+		'agent_ttl_seconds' => '60',
 		'timeout' => '30',
 		'enable_logging' => 'on',
 		'rules_mode' => 'legacy',
 		'log_retention_days' => '7',
-		'active_ips_timeout_seconds' => '120',
+		'active_ips_timeout_seconds' => '300',
 		'active_ips_refresh_seconds' => '5',
 	];
 
@@ -685,7 +685,7 @@ function zidproxy_resync() {
 		set_rcvar('zid_proxy_listen', $listen_addr);
 		set_rcvar('zid_proxy_rules', ZIDPROXY_RULES_FILE);
 		set_rcvar('zid_proxy_log', $enable_logging ? ZIDPROXY_LOG_FILE : '/dev/null');
-		$active_ips_timeout = $zidproxy_config['active_ips_timeout_seconds'] ?? '120';
+		$active_ips_timeout = $zidproxy_config['active_ips_timeout_seconds'] ?? '300';
 		$active_ips_refresh = $zidproxy_config['active_ips_refresh_seconds'] ?? '5';
 		set_rcvar('zid_proxy_active_ips_json', ZIDPROXY_ACTIVE_IPS_JSON);
 		set_rcvar('zid_proxy_active_ips_timeout_seconds', $active_ips_timeout);
@@ -1065,10 +1065,10 @@ load_rc_config $name
 	: ${zid_proxy_log:="/var/log/zid-proxy.log"}
 	: ${zid_proxy_pid:="/var/run/zid-proxy.pid"}
 	: ${zid_proxy_active_ips_json:="/var/run/zid-proxy.active_ips.json"}
-	: ${zid_proxy_active_ips_timeout_seconds:="120"}
+	: ${zid_proxy_active_ips_timeout_seconds:="300"}
 	: ${zid_proxy_active_ips_interval_seconds:="5"}
 	: ${zid_proxy_agent_listen:=""}
-	: ${zid_proxy_agent_ttl_seconds:="120"}
+	: ${zid_proxy_agent_ttl_seconds:="60"}
 
 pidfile="${zid_proxy_pid}"
 procname="/usr/local/sbin/zid-proxy"

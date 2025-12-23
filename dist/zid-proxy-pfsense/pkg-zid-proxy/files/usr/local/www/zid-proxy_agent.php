@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
 $pconfig = [
 	'agent_interface' => $zidcfg['agent_interface'] ?? 'lan',
 	'agent_listen_port' => $zidcfg['agent_listen_port'] ?? '18443',
-	'agent_ttl_seconds' => $zidcfg['agent_ttl_seconds'] ?? '120',
+	'agent_ttl_seconds' => $zidcfg['agent_ttl_seconds'] ?? '60',
 ];
 
 $listen_addr = zidproxy_agent_listen_addr($pconfig['agent_interface'], $pconfig['agent_listen_port']);
@@ -153,7 +153,7 @@ $section->addInput(new Form_Input(
 	gettext('Identity TTL (s)'),
 	'number',
 	$pconfig['agent_ttl_seconds']
-))->setHelp(gettext('Clear Machine/User after this many seconds without heartbeat. Default: 120.'));
+))->setHelp(gettext('Clear Machine/User after this many seconds without heartbeat. Default: 60.'));
 
 $form->add($section);
 

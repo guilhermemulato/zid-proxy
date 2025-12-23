@@ -1,117 +1,186 @@
-# CLAUDE.md
+# AGENTS.md (Guia do Repositório) — zid-proxy (pfSense) + zid-agent (Desktop)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Este arquivo descreve, em português (Brasil), como o projeto funciona, sua arquitetura, onde ficam os arquivos e como fazer build/atualização. A intenção é que qualquer pessoa que chegar agora consiga entender rapidamente “o que é o quê”.
 
-## Project Overview
+## Visão Geral
 
-zid-proxy is a transparent SNI proxy for pfSense 2.8.1 (FreeBSD 15.x) written in Go. It performs dual-factor filtering based on source IP and destination hostname (extracted from TLS SNI extension).
+O **zid-proxy** é um proxy transparente TCP para HTTPS que faz filtragem baseada em:
+- **IP de origem** (cliente) e
+- **Hostname** extraído do **SNI** (TLS ClientHello).
 
-## Build Commands
+Ele roda no **pfSense (FreeBSD)** e integra com uma GUI (páginas PHP) no pfSense para gerenciar regras e visualizar conexões.
+
+Além disso, existe o **zid-agent** (Windows/Linux), que roda no computador do usuário e envia “heartbeats” para o pfSense com:
+- `hostname` (nome da máquina) e
+- `username` (usuário logado),
+
+para enriquecer as telas de “Active IPs” e “Logs”.
+
+## Componentes do Sistema
+
+### 1) Daemon no pfSense: `zid-proxy` (Go)
+Responsável por:
+- Escutar conexões TCP (normalmente tráfego redirecionado via NAT/port-forward para porta do proxy).
+- Ler TLS ClientHello e extrair **SNI**.
+- Aplicar regras (ALLOW/BLOCK) combinando `srcIP + hostname`.
+- Logar conexões em arquivo.
+- Gerar snapshot JSON dos IPs ativos (tráfego agregado por IP).
+- Expor uma API HTTP (somente LAN) para receber heartbeats do agent.
+
+### 2) Integração GUI no pfSense: `pkg-zid-proxy` (PHP/XML/SH)
+Responsável por:
+- Criar as abas do pacote em **Services > ZID Proxy**.
+- Persistir configurações no `config.xml` do pfSense.
+- Gerar `rc.conf` e o script `rc.d` que inicia o daemon com os flags corretos.
+- Instalar/atualizar/remover arquivos de UI e scripts auxiliares.
+
+### 3) Desktop agent: `zid-agent` (Go, Windows/Linux)
+Responsável por:
+- Descobrir o pfSense (primeiro tenta **gateway default**, depois fallback **DNS** `zid-proxy.lan`).
+- Enviar `POST` periódico para o pfSense com `hostname/username`.
+
+## Fluxos Principais
+
+### Fluxo A — Proxy e regras (SNI)
+1. Cliente abre HTTPS (TCP/443) e é redirecionado para o `zid-proxy`.
+2. `zid-proxy` lê ClientHello, extrai SNI.
+3. Aplica regras:
+   - **ALLOW tem prioridade** sobre **BLOCK**
+   - Default: **ALLOW** se não houver match
+4. Se BLOCK: fecha com RST (linger 0).
+5. Se ALLOW: conecta no upstream `hostname:443` e faz proxy bidirecional.
+
+### Fluxo B — Active IPs (tráfego agregado por IP)
+1. O tracker registra conexões/bytes por IP (`internal/activeips`).
+2. Periodicamente é gerado o JSON: `/var/run/zid-proxy.active_ips.json`.
+3. A aba “Active IPs” (`zid-proxy_active_ips.php`) lê esse JSON e exibe.
+
+### Fluxo C — Agent (hostname/user → IP) e TTL
+1. `zid-agent` envia heartbeat para o pfSense:
+   - `POST http://<gateway>:18443/api/v1/agent/heartbeat`
+2. O `zid-proxy` registra a identidade do IP de origem.
+3. A identidade tem **TTL (sem heartbeat)**: após X segundos sem heartbeat, `Machine/User` ficam vazios (mesmo que o IP continue ativo por tráfego).
+
+### Fluxo D — Logs enriquecidos na GUI
+1. O `zid-proxy` grava logs no arquivo (sempre).
+2. A aba “Logs” lê o arquivo e também lê o snapshot de Active IPs:
+   - se o `source_ip` do log estiver **ativo**, a UI mostra badges `Machine/User`.
+   - se não estiver ativo, mostra vazio.
+
+## Formatos de Arquivo
+
+### Regras (arquivo)
+Local: `/usr/local/etc/zid-proxy/access_rules.txt`
+
+Formato (modo legacy):
+`TYPE;IP_OR_CIDR;HOSTNAME`
+
+Exemplos:
+- `BLOCK;192.168.1.0/24;*.facebook.com`
+- `ALLOW;192.168.1.100;*.facebook.com`
+
+### Log (arquivo)
+Local: `/var/log/zid-proxy.log`
+
+Formato atual:
+`TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION | MACHINE | USER`
+
+Obs.: `MACHINE` e `USER` podem estar vazios.
+
+### Active IPs (JSON snapshot)
+Local: `/var/run/zid-proxy.active_ips.json`
+
+Contém IPs agregados e, quando disponível, `machine/username`.
+
+## Estrutura do Repositório (o que cada grupo faz)
+
+### Go (daemon e agent)
+- `cmd/zid-proxy/` — binário do daemon no pfSense.
+- `cmd/zid-agent/` — binário do agent (Windows/Linux).
+- `cmd/zid-proxy-logrotate/` — helper para rotação de log.
+- `internal/`
+  - `activeips/` — tracker e snapshot de IPs ativos (bytes/conns) + identidade com TTL.
+  - `agent/` — registry de identidades (IP → machine/user) para uso em runtime/logs.
+  - `agenthttp/` — API HTTP do agent (endpoint de heartbeat).
+  - `config/` — defaults e configuração usada pelo daemon.
+  - `gateway/` — descoberta de gateway default (Linux/Windows) usada pelo agent.
+  - `logger/` — logger estruturado (formato com colunas separadas por `|`).
+  - `logrotate/` — rotação diária numérica do log.
+  - `proxy/` — listener TCP, handler, proxy bidirecional.
+  - `rules/` — parser/matcher de regras (legacy e/ou suporte a grupos conforme GUI).
+  - `sni/` — parsing de ClientHello para extrair SNI.
+
+### pfSense package (GUI/instalação)
+- `pkg-zid-proxy/files/` — “root filesystem” do pacote (o que vai para `/usr/local/...` no pfSense).
+  - `pkg-zid-proxy/files/usr/local/pkg/` — include PHP e `zid-proxy.xml` (abas/menu).
+  - `pkg-zid-proxy/files/usr/local/www/` — páginas da GUI:
+    - `zid-proxy_settings.php` — configurações do daemon e controles de serviço.
+    - `zid-proxy_agent.php` — configurações do listener/TTL do agent.
+    - `zid-proxy_active_ips.php` — lista de IPs ativos (snapshot JSON).
+    - `zid-proxy_log.php` — visualização do log (com enrichment via Active IPs).
+    - `zid-proxy_groups.php` — gestão de grupos (modo groups).
+    - `zid-proxy_rules.php` — regras legacy.
+- `pkg-zid-proxy/install.sh` — instala/atualiza os arquivos no pfSense (não apaga config.xml).
+- `pkg-zid-proxy/update.sh` — updater “completo” (baixa bundle, extrai, roda `install.sh`).
+- `pkg-zid-proxy/update-bootstrap.sh` — updater “bootstrap” instalado em `/usr/local/sbin/zid-proxy-update`.
+- `pkg-zid-proxy/uninstall.sh` — remove arquivos do pacote.
+- `pkg-zid-proxy/diagnose.sh` — diagnóstico de instalação/arquivos.
+- `pkg-zid-proxy/pkg-plist` — lista de arquivos do pacote (importante manter atualizado).
+
+### Build e artefatos
+- `build/` — binários gerados localmente (não versionar).
+- `dist/` — staging para empacotar bundles (não versionar).
+- `scripts/bundle-latest.sh` — monta os bundles `latest` e atualiza `sha256.txt`.
+- `zid-proxy-pfsense-latest.version` — arquivo de versão usado pelo updater para decidir “Already up-to-date”.
+- `sha256.txt` — checksums dos bundles.
+
+## Comandos de Build e Testes
 
 ```bash
-# Build for FreeBSD (pfSense target)
-make build-freebsd
-# Or directly:
-GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -o build/zid-proxy ./cmd/zid-proxy
-
-# Build for local testing
-make build
-
-# Run tests
 make test
 
-# Run locally for development
-make run
+# Binários do pfSense (FreeBSD/amd64)
+make build-freebsd
+
+# Agents para testes (Linux/Windows amd64)
+make build-agent-linux
+make build-agent-windows
+
+# Empacotar bundles latest (gera 3 tarballs + sha256.txt)
+make bundle-latest
 ```
 
-## Architecture
+## Bundles (sempre separados)
 
+O processo de release gera 3 arquivos:
+- `zid-proxy-pfsense-latest.tar.gz` (pfSense: binários + pkg-zid-proxy + scripts)
+- `zid-agent-linux-latest.tar.gz` (agent Linux)
+- `zid-agent-windows-latest.tar.gz` (agent Windows)
+
+## Atualização no Cliente (pfSense)
+
+No pfSense, o arquivo `/usr/local/sbin/zid-proxy-update` é o ponto de entrada recomendado:
+- Ele verifica a versão remota comparando com `...latest.version`.
+- Se houver versão nova, baixa o bundle e roda o `update.sh` embarcado.
+
+Exemplos:
+```sh
+sh /usr/local/sbin/zid-proxy-update
+sh /usr/local/sbin/zid-proxy-update -f
+sh /usr/local/sbin/zid-proxy-update -u https://.../zid-proxy-pfsense-latest.tar.gz
 ```
-cmd/zid-proxy/main.go      # Entry point, signal handling, PID management
-internal/
-  config/config.go         # Configuration loading
-  sni/parser.go            # TLS ClientHello parsing, SNI extraction
-  rules/rules.go           # Rule file parsing and matching logic
-  proxy/server.go          # TCP listener, connection accept loop
-  proxy/handler.go         # Connection handler, RST blocking, bidirectional proxy
-  logger/logger.go         # File-based structured logging
-scripts/rc.d/zid-proxy     # FreeBSD service script
-```
 
-## Key Technical Details
+## Padrões e Regras de Desenvolvimento
 
-- **SNI Extraction**: Parse TLS ClientHello to extract server_name extension (type 0x0000)
-- **Rule Format**: `TYPE;IP_OR_CIDR;HOSTNAME` (e.g., `BLOCK;192.168.1.0/24;*.facebook.com`)
-- **Decision Logic**: ALLOW priority > BLOCK; default ALLOW if no match
-- **Block Action**: TCP RST via `SetLinger(0)` before close
-- **Config Reload**: SIGHUP signal triggers rules reload
-- **Log Format**: `TIMESTAMP | SOURCE_IP | HOSTNAME | ACTION`
+- Go: sempre rodar `gofmt -w .` antes de entregar alterações.
+- Testes: preferir testes determinísticos em `internal/*/*_test.go`.
+- Mudou código? Atualize o `CHANGELOG.md` e **bump de versão** no `Makefile`.
+- Alteração pequena: use sufixo incremental (ex.: `1.0.11.3.2.4`).
+- Ao final, gere novamente os bundles (`make bundle-latest`) e garanta:
+  - `zid-proxy-pfsense-latest.version` atualizado
+  - `sha256.txt` atualizado
 
-## Configuration Files
+## Referências Técnicas
 
-- Rules: `/usr/local/etc/zid-proxy/access_rules.txt`
-- Log: `/var/log/zid-proxy.log`
-- PID: `/var/run/zid-proxy.pid`
-
-## References
-
-- SNI Proxy pattern: https://www.agwa.name/blog/post/writing_an_sni_proxy_in_go
-- pfSense packages: https://docs.netgate.com/pfsense/en/latest/development/develop-packages.html
-- e2guardian reference: https://github.com/marcelloc/e2guardian
-
-# Repository Guidelines
-
-## Project Structure
-
-- `cmd/zid-proxy/`: main entrypoint and CLI flags.
-- `internal/`: core implementation (`config/`, `sni/`, `rules/`, `proxy/`, `logger/`).
-- `configs/`: example configuration (e.g., `configs/access_rules.txt`).
-- `scripts/rc.d/`: FreeBSD/pfSense service script.
-- `pkg-zid-proxy/`: pfSense package assets (XML/PHP pages, install helpers).
-- `build/`: local build output (generated).
-- `dist/`: packaged artifacts for pfSense releases (generated).
-- Docs: `README.md`, `INSTALL-PFSENSE.md`, `TROUBLESHOOTING.md`, `CHANGELOG.md`.
-
-## Build, Test, and Development Commands
-
-- `make build`: build for your current OS into `build/zid-proxy`.
-- `make build-freebsd`: build the pfSense target binary (`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0`).
-- `make test`: run all Go tests (`go test -v ./...`).
-- `make run`: run locally with sample rules and log file.
-- `make clean`: remove `build/`.
-
-## Coding Style & Naming Conventions
-
-- Go code follows standard formatting: run `gofmt -w .` before opening a PR.
-- Keep packages lowercase and cohesive (domain-oriented folders under `internal/`).
-- Prefer explicit names over abbreviations (e.g., `rulesPath`, `listenAddr`).
-- Keep configuration defaults and flags aligned with `README.md`/rc.conf examples.
-
-## Testing Guidelines
-
-- Tests use the Go standard library (`testing`) and live alongside code as `*_test.go`.
-- Name tests `TestXxx` and keep them deterministic (no network access required).
-- When changing rule matching or SNI parsing, add/adjust unit tests in:
-  `internal/rules/`, `internal/sni/`, and `internal/logger/`.
-
-## Commit & Pull Request Guidelines
-
-- Current history uses short, release-style subjects (e.g., `Versao estavel 1.0.8`).
-- For new work, use clear, imperative subjects; recommended patterns:
-  `feat: ...`, `fix: ...`, `chore(release): 1.0.9`, or keep `Versao X.Y.Z` consistently.
-- PRs should include: what changed, how you tested (`make test`, `make build-freebsd`), and
-  any pfSense UI changes (screenshots for `pkg-zid-proxy/files/usr/local/www/`).
-
-## Release Notes (pfSense)
-
-- If you bump versions, update `Makefile` (`VERSION=...`) and relevant docs/artifacts
-  (e.g., `CHANGELOG.md`, `INSTALL-PFSENSE.md`, and checksums like `sha256.txt`).
-
-
-  ## Specs
-- Sempre ao final, se necessario gere novamente os binarios e compacte todos os arquivos em um tar com a versao latest, para facilitar o scp
-- Separe sempre os bundle dos binarios, um para zid-proxy, um para agente windows e outro para o agente linux
-- Sempre apos alguma alteracao nos codigo registro o que foi alterado no CHANGELOG.md, criando uma nova versao na sequencia
-- Caso seja uma alteracao bem pequena, so adicione um numero na versao, Tipo 1.0.8.1
-- Deixe algum arquivo ou algum lugar salvo com a versao atual, para que quando o update.sh for executado no cliente, ele consiga comparar se é a mesma versao, caso seja significa que ja esta atualizado, e para o processo de update
-- 
+- SNI proxy pattern: https://www.agwa.name/blog/post/writing_an_sni_proxy_in_go
+- Desenvolvimento de pacotes pfSense: https://docs.netgate.com/pfsense/en/latest/development/develop-packages.html

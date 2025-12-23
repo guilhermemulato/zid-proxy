@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -77,11 +78,17 @@ func (s *Server) heartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
+
+	// Log heartbeat reception with detailed info
+	log.Printf("[AGENT] Heartbeat received: ip=%s machine=%q username=%q", srcIP, machine, username)
+
 	if s.registry != nil {
 		s.registry.Update(srcIP, machine, username, now)
+		log.Printf("[AGENT] Registry updated for IP: %s", srcIP)
 	}
 	if s.onBeat != nil {
 		s.onBeat(srcIP, machine, username)
+		log.Printf("[AGENT] Active IPs tracker notified for IP: %s", srcIP)
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

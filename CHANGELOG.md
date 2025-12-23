@@ -2,6 +2,25 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
+## [1.0.11.3.2.5] - 2025-12-23
+
+### Fixed
+- Active IPs: corrigido cálculo de idle time que mostrava valores incorretos (103661s)
+- Active IPs: identidades (Machine/Username) agora aparecem corretamente no Windows e Linux agents
+- Active IPs: resolvido problema de "flickering" (IPs saindo e voltando da tabela)
+
+### Changed
+- **Agent TTL**: padrão alterado de 120s para **60s** (identidade expira mais rápido se agent parar)
+- **Active IPs Timeout**: padrão alterado de 120s para **300s** (IPs permanecem 5min na tabela após última atividade)
+- Agent TTL: validação ajustada para aceitar valores entre 10s e 600s (antes: mínimo 30s)
+
+### Added
+- Logs detalhados de heartbeat do agent (IP, Machine, Username) para facilitar debugging
+- Logs quando identidade é registrada ou expira por TTL
+- Warning quando agent tenta registrar identidade para IP sem tráfego
+- Nova coluna "Last Heartbeat" na tabela Active IPs mostrando quando foi o último heartbeat do agent
+- Campos `identity_seen` e `identity_idle_seconds` no JSON snapshot de Active IPs
+
 ## [1.0.11.3] - 2025-12-19
 
 ### Added

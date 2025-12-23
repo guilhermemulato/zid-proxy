@@ -48,9 +48,9 @@ func Default() *Config {
 		WriteTimeout:      30 * time.Second,
 		ActiveIPsFile:     "/var/run/zid-proxy.active_ips.json",
 		ActiveIPsInterval: 2 * time.Second,
-		ActiveIPsTimeout:  120 * time.Second,
+		ActiveIPsTimeout:  300 * time.Second,
 		ActiveIPsMax:      5000,
 		AgentListenAddr:   "",
-		AgentTTL:          120 * time.Second,
+		AgentTTL:          60 * time.Second,
 	}
 }

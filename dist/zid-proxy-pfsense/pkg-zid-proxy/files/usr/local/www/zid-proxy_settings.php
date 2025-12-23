@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'rules_mode' => $zidcfg['rules_mode'] ?? 'legacy',
 		'timeout' => $zidcfg['timeout'] ?? '30',
 		'log_retention_days' => $zidcfg['log_retention_days'] ?? '7',
-		'active_ips_timeout_seconds' => $zidcfg['active_ips_timeout_seconds'] ?? '120',
+		'active_ips_timeout_seconds' => $zidcfg['active_ips_timeout_seconds'] ?? '300',
 		'active_ips_refresh_seconds' => $zidcfg['active_ips_refresh_seconds'] ?? '5',
 	];
 
@@ -307,7 +307,7 @@ $section2->addInput(new Form_Input(
 		gettext('Active IPs Timeout (s)'),
 		'number',
 		$pconfig['active_ips_timeout_seconds']
-	))->setHelp(gettext('Remove an IP after this many seconds without traffic. Default: 120 (range 10-86400).'));
+	))->setHelp(gettext('Remove an IP after this many seconds without traffic. Default: 300 (range 10-86400).'));
 
 	$section2->addInput(new Form_Input(
 		'active_ips_refresh_seconds',

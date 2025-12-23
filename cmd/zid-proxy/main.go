@@ -50,8 +50,12 @@ func main() {
 	}
 	cfg.ActiveIPsInterval = time.Duration(*activeIPsIntervalSec) * time.Second
 	cfg.ActiveIPsTimeout = time.Duration(*activeIPsTimeoutSec) * time.Second
-	if *agentTTLSeconds < 30 {
-		*agentTTLSeconds = 30
+	// Agent TTL: minimum 10s, maximum 600s (10 minutes)
+	if *agentTTLSeconds < 10 {
+		*agentTTLSeconds = 10
+	}
+	if *agentTTLSeconds > 600 {
+		*agentTTLSeconds = 600
 	}
 	cfg.AgentTTL = time.Duration(*agentTTLSeconds) * time.Second
 

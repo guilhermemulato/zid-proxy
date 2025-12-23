@@ -2,6 +2,7 @@ package activeips
 
 import (
 	"encoding/json"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -43,16 +44,18 @@ type Snapshot struct {
 }
 
 type IPSnapshot struct {
-	SrcIP        string `json:"src_ip"`
-	Machine      string `json:"machine,omitempty"`
-	Username     string `json:"username,omitempty"`
-	FirstSeen    string `json:"first_seen"`
-	LastActivity string `json:"last_activity"`
-	IdleSeconds  int    `json:"idle_seconds"`
-	BytesIn      uint64 `json:"bytes_in"`
-	BytesOut     uint64 `json:"bytes_out"`
-	BytesTotal   uint64 `json:"bytes_total"`
-	ActiveConns  int    `json:"active_conns"`
+	SrcIP            string `json:"src_ip"`
+	Machine          string `json:"machine,omitempty"`
+	Username         string `json:"username,omitempty"`
+	FirstSeen        string `json:"first_seen"`
+	LastActivity     string `json:"last_activity"`
+	IdentitySeen     string `json:"identity_seen,omitempty"`
+	IdleSeconds      int    `json:"idle_seconds"`
+	IdentityIdleSecs int    `json:"identity_idle_seconds,omitempty"`
+	BytesIn          uint64 `json:"bytes_in"`
+	BytesOut         uint64 `json:"bytes_out"`
+	BytesTotal       uint64 `json:"bytes_total"`
+	ActiveConns      int    `json:"active_conns"`
 }
 
 func New(opts Options) *Tracker {
@@ -176,6 +179,7 @@ func (t *Tracker) SetIdentity(srcIP, machine, username string, now time.Time) {
 
 	s := t.ips[srcIP]
 	if s == nil {
+		log.Printf("[ACTIVEIPS] Warning: Attempt to set identity for non-tracked IP %s (machine=%q, username=%q). IP must have traffic first.", srcIP, machine, username)
 		return
 	}
 	machine = sanitizeIdentityField(machine)
@@ -189,6 +193,7 @@ func (t *Tracker) SetIdentity(srcIP, machine, username string, now time.Time) {
 	if !now.IsZero() {
 		s.IdentitySeen = now
 	}
+	log.Printf("[ACTIVEIPS] Identity set for IP %s: machine=%q username=%q", srcIP, machine, username)
 }
 
 func (t *Tracker) GC(now time.Time) {
@@ -236,6 +241,9 @@ func (t *Tracker) Snapshot(now time.Time) Snapshot {
 	for _, s := range t.ips {
 		if t.opts.IdentityTTL > 0 {
 			if s.IdentitySeen.IsZero() || now.Sub(s.IdentitySeen) > t.opts.IdentityTTL {
+				if s.Machine != "" || s.Username != "" {
+					log.Printf("[ACTIVEIPS] Clearing identity for IP %s (TTL expired, last seen: %v, TTL: %v)", s.SrcIP, s.IdentitySeen, t.opts.IdentityTTL)
+				}
 				s.Machine = ""
 				s.Username = ""
 			}
@@ -246,7 +254,8 @@ func (t *Tracker) Snapshot(now time.Time) Snapshot {
 			idle = 0
 		}
 		total := s.BytesIn + s.BytesOut
-		out.IPs = append(out.IPs, IPSnapshot{
+
+		snap := IPSnapshot{
 			SrcIP:        s.SrcIP,
 			Machine:      s.Machine,
 			Username:     s.Username,
@@ -257,7 +266,19 @@ func (t *Tracker) Snapshot(now time.Time) Snapshot {
 			BytesOut:     s.BytesOut,
 			BytesTotal:   total,
 			ActiveConns:  s.ActiveConns,
-		})
+		}
+
+		// Add identity timestamp and idle if available
+		if !s.IdentitySeen.IsZero() {
+			snap.IdentitySeen = s.IdentitySeen.UTC().Format(time.RFC3339)
+			identityIdle := int(now.Sub(s.IdentitySeen).Seconds())
+			if identityIdle < 0 {
+				identityIdle = 0
+			}
+			snap.IdentityIdleSecs = identityIdle
+		}
+
+		out.IPs = append(out.IPs, snap)
 	}
 
 	sort.Slice(out.IPs, func(i, j int) bool {

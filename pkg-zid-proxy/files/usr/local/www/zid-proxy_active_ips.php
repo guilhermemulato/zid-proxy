@@ -117,6 +117,7 @@ display_top_tabs($tab_array);
 						<th><?=gettext('User')?></th>
 						<th><?=gettext('Last Activity')?></th>
 						<th><?=gettext('Idle')?></th>
+						<th><?=gettext('Last Heartbeat')?></th>
 						<th><?=gettext('Bytes Total')?></th>
 						<th><?=gettext('Bytes In')?></th>
 						<th><?=gettext('Bytes Out')?></th>
@@ -135,6 +136,17 @@ display_top_tabs($tab_array);
 									<?=htmlspecialchars(sprintf("%ds", (int)$row['idle_seconds']))?>
 								<?php else: ?>
 									<?=htmlspecialchars(zidproxy_ago($row['last_activity'] ?? ''))?>
+								<?php endif; ?>
+							</td>
+							<td>
+								<?php if (!empty($row['identity_seen'])): ?>
+									<?php if (isset($row['identity_idle_seconds'])): ?>
+										<?=htmlspecialchars(sprintf("%ds ago", (int)$row['identity_idle_seconds']))?>
+									<?php else: ?>
+										<?=htmlspecialchars(zidproxy_ago($row['identity_seen']))?>
+									<?php endif; ?>
+								<?php else: ?>
+									<span style="color: #999;">—</span>
 								<?php endif; ?>
 							</td>
 							<td><?=htmlspecialchars(zidproxy_format_bytes((int)($row['bytes_total'] ?? 0)))?></td>
