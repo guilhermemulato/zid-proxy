@@ -20,6 +20,11 @@ if [ ! -f build/zid-proxy ] || [ ! -f build/zid-proxy-logrotate ]; then
 	exit 2
 fi
 
+# zid-appid is optional but recommended
+if [ ! -f build/zid-appid ]; then
+	echo "WARN: zid-appid not found in ./build. AppID features will use fallback detection." >&2
+fi
+
 if [ ! -f build/zid-agent-linux-amd64 ] || [ ! -f build/zid-agent-windows-amd64.exe ]; then
 	echo "ERROR: missing agent binaries in ./build. Run: make build-agent-linux build-agent-windows" >&2
 	exit 2
@@ -43,6 +48,12 @@ cp -R pkg-zid-proxy "${STAGE_DIR_PFSENSE}/pkg-zid-proxy"
 cp -f build/zid-proxy "${STAGE_DIR_PFSENSE}/build/zid-proxy"
 cp -f build/zid-proxy-logrotate "${STAGE_DIR_PFSENSE}/build/zid-proxy-logrotate"
 chmod 755 "${STAGE_DIR_PFSENSE}/build/zid-proxy" "${STAGE_DIR_PFSENSE}/build/zid-proxy-logrotate"
+
+# Include zid-appid if available
+if [ -f build/zid-appid ]; then
+	cp -f build/zid-appid "${STAGE_DIR_PFSENSE}/build/zid-appid"
+	chmod 755 "${STAGE_DIR_PFSENSE}/build/zid-appid"
+fi
 
 cp -f build/zid-agent-linux-amd64 "${STAGE_DIR_AGENT_LINUX}/zid-agent-linux-amd64"
 chmod 755 "${STAGE_DIR_AGENT_LINUX}/zid-agent-linux-amd64"

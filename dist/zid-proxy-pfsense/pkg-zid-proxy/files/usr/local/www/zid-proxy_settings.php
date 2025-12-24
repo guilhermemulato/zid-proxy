@@ -166,6 +166,7 @@ include("head.inc");
 	$tab_array[] = array(gettext("Agent"), false, "/zid-proxy_agent.php");
 	$tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 	$tab_array[] = array(gettext("Access Rules"), false, "/zid-proxy_rules.php");
+	$tab_array[] = array(gettext("AppID"), false, "/zid-proxy_appid.php");
 	$tab_array[] = array(gettext("Logs"), false, "/zid-proxy_log.php");
 	display_top_tabs($tab_array);
 

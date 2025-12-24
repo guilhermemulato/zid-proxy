@@ -86,7 +86,9 @@ func (h *Handler) Handle() {
 			username = u
 		}
 	}
-	h.server.logger.LogConnection(clientIP.String(), hostname, groupName, machine, username, logAction)
+	// TODO: Integrate with AppID daemon to detect app
+	app := "" // Will be filled by AppID integration
+	h.server.logger.LogConnection(clientIP.String(), hostname, groupName, machine, username, app, logAction)
 
 	if matched {
 		log.Printf("%s | %s -> %s | %s (matched rule)", clientIP, hostname, action, logAction)

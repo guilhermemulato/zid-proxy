@@ -1,5 +1,5 @@
-aa3519b1c2af46278ed9dd0902d2002da1b8271deaf39422e5d7d5aafe3572d0  zid-proxy-pfsense-latest.tar.gz
-1d19964446342e20085e0234324669dceb09ee26cab53cd45dcdf3252cd0e1b4  zid-agent-linux-latest.tar.gz
-f9ecfa42ab9a73098fbe9b7fd1a5da7d0bc0b77839f6aec751a841acafd929ef  zid-agent-windows-latest.tar.gz
+6233c6a1a7da0a249e6ef5cc784806f18697c3290aed8f3ad621bff40394276c  zid-proxy-pfsense-latest.tar.gz
+2ee1d8394f9a9a7f0b7c6c3c60095626f33129a800e22ade6923647a17850b4a  zid-agent-linux-latest.tar.gz
+b977b2e055717ff5905aab46994774c15f1760329edd162e211bef8bee061a57  zid-agent-windows-latest.tar.gz
 f67a2f4423ac87f13bdd3bd65ab0c508d570a75f04c8ca3c03c068e180616501  zid-agent-linux-gui-latest.tar.gz
 db0a7d1e43f9a7fd4ae25923bf8d7ff355a54bb9387a80d78af61959e736a729  zid-agent-windows-gui-latest.tar.gz

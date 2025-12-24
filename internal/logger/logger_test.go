@@ -80,7 +80,7 @@ func TestLoggerReopen(t *testing.T) {
 	}
 
 	// Log entry before reopen
-	logger.LogConnection("10.0.0.1", "before.example.com", "g1", "pc-01", "alice", ActionAllow)
+	logger.LogConnection("10.0.0.1", "before.example.com", "g1", "pc-01", "alice", "netflix", ActionAllow)
 	logger.Flush()
 
 	// Reopen (simulating log rotation)
@@ -89,7 +89,7 @@ func TestLoggerReopen(t *testing.T) {
 	}
 
 	// Log entry after reopen
-	logger.LogConnection("10.0.0.2", "after.example.com", "g2", "", "", ActionBlock)
+	logger.LogConnection("10.0.0.2", "after.example.com", "g2", "", "", "", ActionBlock)
 	logger.Close()
 
 	// Verify both entries exist
@@ -138,7 +138,7 @@ func TestNullLogger(t *testing.T) {
 	logger := NewNullLogger()
 
 	// These should not panic
-	logger.LogConnection("192.168.1.1", "example.com", "", "", "", ActionAllow)
+	logger.LogConnection("192.168.1.1", "example.com", "", "", "", "", ActionAllow)
 	logger.Log(Entry{})
 
 	if err := logger.Flush(); err != nil {

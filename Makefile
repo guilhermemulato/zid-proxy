@@ -1,9 +1,10 @@
-.PHONY: all build build-freebsd clean test install bundle-latest
+.PHONY: all build build-freebsd clean test install bundle-latest build-appid-freebsd
 
 BINARY=zid-proxy
 LOGROTATE_BINARY=zid-proxy-logrotate
 AGENT_BINARY=zid-agent
-VERSION=1.0.11.3.2.10
+APPID_BINARY=zid-appid
+VERSION=1.0.11.3.2.11
 BUILD_DIR=build
 LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION)"
 
@@ -29,6 +30,13 @@ build:
 build-freebsd:
 	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/zid-proxy
 	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(LOGROTATE_BINARY) ./cmd/zid-proxy-logrotate
+	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(APPID_BINARY) ./cmd/zid-appid
+
+build-appid-freebsd:
+	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(APPID_BINARY) ./cmd/zid-appid
+
+build-appid-linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build $(LDFLAGS) -o $(BUILD_DIR)/$(APPID_BINARY)-linux ./cmd/zid-appid
 
 build-agent-linux:
 		@echo "Building Linux agent (requires system dependencies)..."

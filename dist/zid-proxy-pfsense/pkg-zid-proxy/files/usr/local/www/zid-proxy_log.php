@@ -79,7 +79,8 @@ if (!empty($filter_term)) {
 		       (strpos(strtolower($entry['hostname']), $filter_lower) !== false) ||
 		       (strpos(strtolower($entry['group'] ?? ''), $filter_lower) !== false) ||
 		       (strpos(strtolower($entry['machine'] ?? ''), $filter_lower) !== false) ||
-		       (strpos(strtolower($entry['username'] ?? ''), $filter_lower) !== false);
+		       (strpos(strtolower($entry['username'] ?? ''), $filter_lower) !== false) ||
+		       (strpos(strtolower($entry['app'] ?? ''), $filter_lower) !== false);
 	});
 }
 
@@ -92,6 +93,7 @@ $tab_array[] = array(gettext("Active IPs"), false, "/zid-proxy_active_ips.php");
 $tab_array[] = array(gettext("Agent"), false, "/zid-proxy_agent.php");
 $tab_array[] = array(gettext("Groups"), false, "/zid-proxy_groups.php");
 $tab_array[] = array(gettext("Access Rules"), false, "/zid-proxy_rules.php");
+$tab_array[] = array(gettext("AppID"), false, "/zid-proxy_appid.php");
 $tab_array[] = array(gettext("Logs"), true, "/zid-proxy_log.php");
 display_top_tabs($tab_array);
 
@@ -175,13 +177,14 @@ display_top_tabs($tab_array);
 			<table class="table table-striped table-hover table-condensed">
 				<thead>
 					<tr>
-						<th style="width: 180px;"><?=gettext('Timestamp')?></th>
-						<th style="width: 140px;"><?=gettext('Source IP')?></th>
-						<th style="width: 160px;"><?=gettext('Machine')?></th>
-						<th style="width: 140px;"><?=gettext('User')?></th>
+						<th style="width: 160px;"><?=gettext('Timestamp')?></th>
+						<th style="width: 120px;"><?=gettext('Source IP')?></th>
+						<th style="width: 120px;"><?=gettext('Machine')?></th>
+						<th style="width: 100px;"><?=gettext('User')?></th>
 						<th><?=gettext('Hostname')?></th>
-						<th style="width: 160px;"><?=gettext('Group')?></th>
-						<th style="width: 80px;"><?=gettext('Action')?></th>
+						<th style="width: 120px;"><?=gettext('Group')?></th>
+						<th style="width: 100px;"><?=gettext('App')?></th>
+						<th style="width: 70px;"><?=gettext('Action')?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -220,6 +223,11 @@ if (!empty($log_entries)):
 							<?php endif; ?>
 						</td>
 						<td>
+							<?php if (!empty($entry['app'])): ?>
+								<span class="label label-warning"><?=htmlspecialchars($entry['app'])?></span>
+							<?php endif; ?>
+						</td>
+						<td>
 							<span class="label label-<?=$action_class?>"><?=htmlspecialchars($entry['action'])?></span>
 						</td>
 					</tr>
@@ -228,7 +236,7 @@ if (!empty($log_entries)):
 else:
 ?>
 					<tr>
-						<td colspan="7" class="text-center">
+						<td colspan="8" class="text-center">
 							<?=gettext('No log entries found.')?>
 						</td>
 					</tr>
@@ -380,19 +388,25 @@ else:
 
 		allRows.forEach(function(row) {
 			// Pular linha de "no entries" (colspan)
-			if (row.cells.length < 5) {
+			if (row.cells.length < 6) {
 				return;
 			}
 
 			var sourceIp = row.cells[1].textContent.toLowerCase();
-			var hostname = row.cells[2].textContent.toLowerCase();
-			var group = row.cells[3].textContent.toLowerCase();
+			var machine = row.cells[2].textContent.toLowerCase();
+			var user = row.cells[3].textContent.toLowerCase();
+			var hostname = row.cells[4].textContent.toLowerCase();
+			var group = row.cells[5].textContent.toLowerCase();
+			var app = row.cells[6].textContent.toLowerCase();
 
-			// Mostrar se match em IP, hostname ou group, ou se filtro vazio
+			// Mostrar se match em IP, hostname, group, machine, user ou app, ou se filtro vazio
 			if (searchTerm === '' ||
 				sourceIp.indexOf(searchTerm) !== -1 ||
+				machine.indexOf(searchTerm) !== -1 ||
+				user.indexOf(searchTerm) !== -1 ||
 				hostname.indexOf(searchTerm) !== -1 ||
-				group.indexOf(searchTerm) !== -1) {
+				group.indexOf(searchTerm) !== -1 ||
+				app.indexOf(searchTerm) !== -1) {
 				row.style.display = '';
 				visibleCount++;
 			} else {
@@ -407,7 +421,7 @@ else:
 			if (!noResultRow && allRows.length > 0) {
 				noResultRow = document.createElement('tr');
 				noResultRow.className = 'no-results';
-				noResultRow.innerHTML = '<td colspan="5" class="text-center" style="padding: 20px;">' +
+				noResultRow.innerHTML = '<td colspan="8" class="text-center" style="padding: 20px;">' +
 					'<?=gettext("No log entries match the filter.")?>' +
 					'</td>';
 				tableBody.appendChild(noResultRow);

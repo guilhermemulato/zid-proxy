@@ -54,6 +54,7 @@ cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_log.php ${PREFIX}/www/
 cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_groups.php ${PREFIX}/www/
 cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_active_ips.php ${PREFIX}/www/ 2>/dev/null || true
 cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_agent.php ${PREFIX}/www/ 2>/dev/null || true
+cp -f ${FILES_DIR}${PREFIX}/www/zid-proxy_appid.php ${PREFIX}/www/ 2>/dev/null || true
 
 # Install privilege definitions
 echo "Installing privilege definitions..."
@@ -118,6 +119,20 @@ else
     echo "         You can still use ZID Proxy without daily log rotation."
 fi
 
+# Optional helper binary: zid-appid
+APPID_BINARY_PATH="${PKG_DIR}/../build/zid-appid"
+if [ -f "${APPID_BINARY_PATH}" ]; then
+    echo "Installing zid-appid binary..."
+    TMP_BIN="${PREFIX}/sbin/.zid-appid.new.$$"
+    cp "${APPID_BINARY_PATH}" "${TMP_BIN}"
+    chmod 755 "${TMP_BIN}"
+    mv -f "${TMP_BIN}" "${PREFIX}/sbin/zid-appid"
+    chmod 755 ${PREFIX}/sbin/zid-appid
+else
+    echo "Warning: zid-appid binary not found at ${APPID_BINARY_PATH}"
+    echo "         AppID features will use fallback hostname detection."
+fi
+
 # Create default rules file
 if [ ! -f ${PREFIX}/etc/zid-proxy/access_rules.txt ]; then
     echo "Creating default rules file..."
@@ -154,6 +169,9 @@ if [ -f ${PREFIX}/www/zid-proxy_active_ips.php ]; then
 fi
 if [ -f ${PREFIX}/www/zid-proxy_agent.php ]; then
     chmod 644 ${PREFIX}/www/zid-proxy_agent.php
+fi
+if [ -f ${PREFIX}/www/zid-proxy_appid.php ]; then
+    chmod 644 ${PREFIX}/www/zid-proxy_appid.php
 fi
 chmod 644 /etc/inc/priv/zid-proxy.priv.inc
 

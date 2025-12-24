@@ -55,6 +55,10 @@
 			<url>/zid-proxy_rules.php</url>
 		</tab>
 		<tab>
+			<text>AppID</text>
+			<url>/zid-proxy_appid.php</url>
+		</tab>
+		<tab>
 			<text>Logs</text>
 			<url>/zid-proxy_log.php</url>
 		</tab>

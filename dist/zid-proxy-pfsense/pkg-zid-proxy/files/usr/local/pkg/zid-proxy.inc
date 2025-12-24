@@ -994,11 +994,12 @@ function zidproxy_get_log_entries($lines = 200) {
 		}
 
 		// Parse:
-		// - Newest: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION | MACHINE | USER
-		// - New: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION
-		// - Old: TIMESTAMP | SOURCE_IP | HOSTNAME | ACTION
+		// - Current: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION | MACHINE | USER | APP
+		// - Legacy: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION | MACHINE | USER
+		// - Older: TIMESTAMP | SOURCE_IP | HOSTNAME | GROUP | ACTION
+		// - Oldest: TIMESTAMP | SOURCE_IP | HOSTNAME | ACTION
 		$parts = array_map('trim', explode('|', $line));
-		if (count($parts) >= 7) {
+		if (count($parts) >= 8) {
 			$entries[] = [
 				'timestamp' => $parts[0],
 				'source_ip' => $parts[1],
@@ -1007,6 +1008,18 @@ function zidproxy_get_log_entries($lines = 200) {
 				'action' => $parts[4],
 				'machine' => $parts[5],
 				'username' => $parts[6],
+				'app' => $parts[7],
+			];
+		} elseif (count($parts) >= 7) {
+			$entries[] = [
+				'timestamp' => $parts[0],
+				'source_ip' => $parts[1],
+				'hostname' => $parts[2],
+				'group' => $parts[3],
+				'action' => $parts[4],
+				'machine' => $parts[5],
+				'username' => $parts[6],
+				'app' => '',
 			];
 		} elseif (count($parts) >= 5) {
 			$entries[] = [
@@ -1017,6 +1030,7 @@ function zidproxy_get_log_entries($lines = 200) {
 				'action' => $parts[4],
 				'machine' => '',
 				'username' => '',
+				'app' => '',
 			];
 		} elseif (count($parts) >= 4) {
 			$entries[] = [
@@ -1027,6 +1041,7 @@ function zidproxy_get_log_entries($lines = 200) {
 				'action' => $parts[3],
 				'machine' => '',
 				'username' => '',
+				'app' => '',
 			];
 		}
 	}

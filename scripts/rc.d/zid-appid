@@ -1,0 +1,118 @@
+#!/bin/sh
+#
+# PROVIDE: zid_appid
+# REQUIRE: NETWORKING zid_proxy
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf to enable zid-appid:
+#
+# zid_appid_enable="YES"
+# zid_appid_socket="/var/run/zid-appid.sock"  # Optional: Unix socket path
+# zid_appid_rules="/usr/local/etc/zid-proxy/appid_rules.txt"  # Optional: AppID rules file
+#
+
+. /etc/rc.subr
+
+name="zid_appid"
+rcvar="zid_appid_enable"
+
+load_rc_config $name
+
+: ${zid_appid_enable:="NO"}
+: ${zid_appid_socket:="/var/run/zid-appid.sock"}
+: ${zid_appid_rules:="/usr/local/etc/zid-proxy/appid_rules.txt"}
+: ${zid_appid_pid:="/var/run/zid-appid.pid"}
+: ${zid_appid_max_flows:="100000"}
+: ${zid_appid_flow_ttl:="300"}
+: ${zid_appid_gc_interval:="60"}
+: ${zid_appid_user:="root"}
+
+pidfile="${zid_appid_pid}"
+procname="/usr/local/sbin/zid-appid"
+command="/usr/sbin/daemon"
+command_args="-f -p ${pidfile} ${procname} \
+    -socket ${zid_appid_socket} \
+    -rules ${zid_appid_rules} \
+    -pid ${zid_appid_pid} \
+    -max-flows ${zid_appid_max_flows} \
+    -flow-ttl ${zid_appid_flow_ttl} \
+    -gc-interval ${zid_appid_gc_interval}"
+
+start_precmd="zid_appid_prestart"
+stop_postcmd="zid_appid_poststop"
+extra_commands="reload status"
+reload_cmd="zid_appid_reload"
+status_cmd="zid_appid_status"
+
+zid_appid_prestart()
+{
+    # Ensure config directory exists
+    mkdir -p /usr/local/etc/zid-proxy
+
+    # Create default AppID rules file if it doesn't exist
+    if [ ! -f ${zid_appid_rules} ]; then
+        cat > ${zid_appid_rules} << 'RULES_EOF'
+# ZID Proxy AppID Rules
+# Format: TYPE;GROUP;APP_NAME
+# TYPE: ALLOW_APP or BLOCK_APP
+# ALLOW_APP rules take priority over BLOCK_APP rules
+#
+# Example rules:
+# BLOCK_APP;acesso_restrito;netflix
+# BLOCK_APP;acesso_restrito;youtube
+# ALLOW_APP;acesso_restrito;microsoft_teams
+RULES_EOF
+        echo "Created default AppID rules file: ${zid_appid_rules}"
+    fi
+
+    # Remove stale socket
+    rm -f ${zid_appid_socket}
+
+    return 0
+}
+
+zid_appid_poststop()
+{
+    rm -f ${pidfile}
+    rm -f ${zid_appid_socket}
+}
+
+zid_appid_reload()
+{
+    if [ -f ${pidfile} ]; then
+        echo "Reloading ${name} rules..."
+        kill -HUP $(cat ${pidfile})
+        echo "AppID rules reloaded."
+    else
+        echo "${name} is not running."
+        return 1
+    fi
+}
+
+zid_appid_status()
+{
+    if [ -f ${pidfile} ]; then
+        pid=$(cat ${pidfile})
+        if kill -0 ${pid} 2>/dev/null; then
+            echo "${name} is running as pid ${pid}."
+            # Show socket status
+            if [ -S ${zid_appid_socket} ]; then
+                echo "Socket: ${zid_appid_socket} (active)"
+            else
+                echo "Socket: ${zid_appid_socket} (not found)"
+            fi
+            # Show rule count if possible
+            rule_count=$(wc -l < ${zid_appid_rules} 2>/dev/null | tr -d ' ')
+            echo "Rules file: ${zid_appid_rules} (${rule_count} lines)"
+            return 0
+        else
+            echo "${name} is not running (stale pid file)."
+            return 1
+        fi
+    else
+        echo "${name} is not running."
+        return 1
+    fi
+}
+
+run_rc_command "$1"
