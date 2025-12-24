@@ -2,6 +2,32 @@
 
 All notable changes to zid-proxy will be documented in this file.
 
+## [1.0.11.3.2.6] - 2025-12-23
+
+### Fixed
+- zid-agent (Windows/Linux): tray agora usa o systray nativo do Fyne, corrigindo ícone ausente e cliques (Logs/Quit) que não respondiam
+- zid-agent: janela de logs agora é criada no `fyne.App` principal (thread correta) e atualiza com segurança a partir de goroutines
+
+## [1.0.11.3.2.7] - 2025-12-23
+
+### Changed
+- zid-agent (Windows/Linux): menu do tray agora usa apenas **Logs** e **Sair** (removido **Quit**)
+- zid-agent (Windows/Linux): ícone do tray atualizado para `favicon.png`
+
+## [1.0.11.3.2.8] - 2025-12-23
+
+### Added
+- Linux installer: opção para habilitar `loginctl enable-linger` e iniciar junto com o boot (systemd user)
+
+## [1.0.11.3.2.9] - 2025-12-24
+
+### Added
+- zid-agent (Windows/Linux): ícone do tray agora reflete status do heartbeat (verde/vermelho)
+- zid-agent (Windows/Linux): tooltip do tray exibe último resultado do heartbeat (target + timestamp)
+- zid-agent (Windows/Linux): menu **Settings** com persistência em `~/.zid-agent/config.json` (porta, DNS fallback, intervalo)
+- zid-agent (Windows/Linux): persistência de logs em `~/.zid-agent/logs.txt` com rotação automática (1MB)
+- zid-agent (Windows/Linux): menu **About** com versão/build e último heartbeat
+
 ## [1.0.11.3.2.5] - 2025-12-23
 
 ### Fixed

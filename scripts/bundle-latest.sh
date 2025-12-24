@@ -84,6 +84,7 @@ hash_one() {
 TMP_SHA="$(mktemp)"
 if [ -f sha256.txt ]; then
 	awk '
+		{gsub(/\r/, "", $2)}
 		$2 != "zid-proxy-pfsense-latest.tar.gz" &&
 		$2 != "zid-agent-linux-latest.tar.gz" &&
 		$2 != "zid-agent-windows-latest.tar.gz"

@@ -1,19 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"strings"
-	"syscall"
-	"time"
 
-	"github.com/guilherme/zid-proxy/internal/gateway"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/driver/desktop"
+	"github.com/guilherme/zid-proxy/internal/agentui"
 )
 
 var (
@@ -21,18 +15,7 @@ var (
 	BuildTime = "unknown"
 )
 
-type heartbeatPayload struct {
-	Hostname string `json:"hostname"`
-	Username string `json:"username"`
-	Version  string `json:"agent_version,omitempty"`
-}
-
 func main() {
-	port := flag.Int("port", 18443, "Agent API port on pfSense (default: 18443)")
-	dnsHost := flag.String("dns", "zid-proxy.lan", "DNS fallback host for pfSense (default: zid-proxy.lan)")
-	path := flag.String("path", "/api/v1/agent/heartbeat", "Heartbeat path")
-	interval := flag.Duration("interval", 30*time.Second, "Heartbeat interval")
-	once := flag.Bool("once", false, "Send one heartbeat and exit")
 	showVersion := flag.Bool("version", false, "Show version and exit")
 	flag.Parse()
 
@@ -41,82 +24,56 @@ func main() {
 		return
 	}
 
-	if *port < 1 || *port > 65535 {
-		log.Fatalf("invalid port: %d", *port)
+	// Create log manager with capacity for 500 messages
+	logMgr := agentui.NewLogManager(500)
+	logMgr.Addf("ZID Agent v%s starting...", Version)
+
+	// Setup config manager (persisted in ~/.zid-agent/config.json)
+	cfg := agentui.DefaultConfig()
+	cfgPath, err := agentui.DefaultConfigPath()
+	if err != nil {
+		logMgr.Addf("Warning: could not resolve config path: %v (using defaults)", err)
 	}
-	if *interval < 5*time.Second {
-		*interval = 5 * time.Second
-	}
-	if !strings.HasPrefix(*path, "/") {
-		*path = "/" + *path
-	}
-
-	hostname, _ := os.Hostname()
-	username := os.Getenv("USERNAME")
-	if username == "" {
-		username = os.Getenv("USER")
-	}
-
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	send := func() {
-		var targets []string
-		if gw, err := gateway.Default(); err == nil && gw != nil {
-			targets = append(targets, fmt.Sprintf("http://%s:%d%s", gw.String(), *port, *path))
-		}
-		if strings.TrimSpace(*dnsHost) != "" {
-			targets = append(targets, fmt.Sprintf("http://%s:%d%s", strings.TrimSpace(*dnsHost), *port, *path))
-		}
-		if len(targets) == 0 {
-			log.Printf("no targets available (no gateway and no dns host)")
-			return
-		}
-
-		payload := heartbeatPayload{
-			Hostname: hostname,
-			Username: username,
-			Version:  Version,
-		}
-		b, _ := json.Marshal(payload)
-
-		for _, url := range targets {
-			req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(b))
-			if err != nil {
-				continue
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Printf("heartbeat failed: url=%s err=%v", url, err)
-				continue
-			}
-			_ = resp.Body.Close()
-			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-				log.Printf("heartbeat ok: url=%s", url)
-				return
-			}
-			log.Printf("heartbeat rejected: url=%s status=%s", url, resp.Status)
+	cfgMgr := agentui.NewConfigManager(cfgPath, cfg)
+	if cfgPath != "" {
+		if err := cfgMgr.LoadFromDisk(); err != nil {
+			logMgr.Addf("Warning: could not load config: %v (using defaults)", err)
 		}
 	}
 
-	send()
-	if *once {
-		return
+	// Persist logs to ~/.zid-agent/logs.txt with rotation (max 1MB)
+	if logPath, err := agentui.DefaultLogPath(); err == nil {
+		logMgr.AddSink(agentui.NewFileLogSink(logPath, agentui.DefaultMaxLogBytes))
+		logMgr.Addf("Log file: %s", logPath)
+	} else {
+		logMgr.Addf("Warning: could not resolve log path: %v (logs only in memory)", err)
 	}
 
-	ticker := time.NewTicker(*interval)
-	defer ticker.Stop()
+	statusMgr := agentui.NewStatusManager()
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
+	// Create context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	for {
-		select {
-		case <-ticker.C:
-			send()
-		case <-sig:
-			return
-		}
+	// Create Fyne app on main thread
+	fyneApp := app.New()
+
+	fyneApp.Lifecycle().SetOnStopped(func() {
+		logMgr.Add("Application stopping...")
+		cancel()
+	})
+
+	// Setup system tray if supported
+	if deskApp, ok := fyneApp.(desktop.App); ok {
+		setupSystemTray(deskApp, fyneApp, logMgr, statusMgr, cfgMgr, cancel, Version, BuildTime)
+	} else {
+		logMgr.Add("Warning: System tray not supported on this platform/driver")
+		showLogsWindow(fyneApp, logMgr)
 	}
+
+	// Start heartbeat goroutine
+	go runHeartbeat(ctx, logMgr, statusMgr, cfgMgr, Version)
+
+	// Run Fyne event loop (blocks until quit)
+	fyneApp.Run()
 }

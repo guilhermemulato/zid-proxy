@@ -1,0 +1,2 @@
+036fd6e3fef3471a79b9b4cada4e0ba702deee2ffb5a3663dc7bf366a27ec950  zid-agent-linux-gui-latest.tar.gz
+7366f4f9fd34e73dc23b667218bed4318cbcaa371b2cc12429e0a6209c5366e7  zid-agent-windows-gui-latest.tar.gz

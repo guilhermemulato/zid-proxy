@@ -34,10 +34,19 @@ Responsável por:
 - Gerar `rc.conf` e o script `rc.d` que inicia o daemon com os flags corretos.
 - Instalar/atualizar/remover arquivos de UI e scripts auxiliares.
 
-### 3) Desktop agent: `zid-agent` (Go, Windows/Linux)
+### 3) Desktop agent: `zid-agent` (Go, Windows/Linux com GUI)
 Responsável por:
-- Descobrir o pfSense (primeiro tenta **gateway default**, depois fallback **DNS** `zid-proxy.lan`).
-- Enviar `POST` periódico para o pfSense com `hostname/username`.
+- Rodar em background com ícone na **system tray** (bandeja do sistema)
+- Descobrir o pfSense (primeiro tenta **gateway default**, depois fallback **DNS** `zid-proxy.lan`)
+- Enviar `POST` a cada **30 segundos** (fixo) com `hostname/username` e `agent_version`
+- Exibir **logs em janela dedicada** (Fyne) acessível via menu do tray
+- Menu de contexto: **Logs** e **Sair**
+
+**Arquitetura GUI:**
+- System tray nativa do Fyne (`desktop.App`) para ícone e menu
+- `Fyne` para janela de logs interativa
+- Ring buffer de 500 mensagens de log em memória
+- Auto-refresh da UI quando novos logs chegam
 
 ## Fluxos Principais
 
@@ -96,12 +105,20 @@ Contém IPs agregados e, quando disponível, `machine/username`.
 
 ### Go (daemon e agent)
 - `cmd/zid-proxy/` — binário do daemon no pfSense.
-- `cmd/zid-agent/` — binário do agent (Windows/Linux).
+- `cmd/zid-agent/` — binário do agent (Windows/Linux) com GUI.
+  - `main.go` — entry point, coordena log manager, heartbeat e system tray.
+  - `heartbeat.go` — loop de heartbeat (30s fixo), descoberta de pfSense, envio de POST.
+  - `tray.go` — configuração do system tray (ícone, menu, eventos).
+  - `logsui.go` — janela Fyne de logs (singleton, auto-refresh).
+  - `assets/icon.go` — ícone embedded para system tray.
 - `cmd/zid-proxy-logrotate/` — helper para rotação de log.
 - `internal/`
   - `activeips/` — tracker e snapshot de IPs ativos (bytes/conns) + identidade com TTL.
   - `agent/` — registry de identidades (IP → machine/user) para uso em runtime/logs.
   - `agenthttp/` — API HTTP do agent (endpoint de heartbeat).
+  - `agentui/` — **(novo)** componentes de UI do agent:
+    - `ringbuffer.go` — circular buffer genérico thread-safe.
+    - `logger.go` — log manager com subscribers e notificações.
   - `config/` — defaults e configuração usada pelo daemon.
   - `gateway/` — descoberta de gateway default (Linux/Windows) usada pelo agent.
   - `logger/` — logger estruturado (formato com colunas separadas por `|`).
@@ -179,6 +196,7 @@ sh /usr/local/sbin/zid-proxy-update -u https://.../zid-proxy-pfsense-latest.tar.
 - Ao final, gere novamente os bundles (`make bundle-latest`) e garanta:
   - `zid-proxy-pfsense-latest.version` atualizado
   - `sha256.txt` atualizado
+- Sempre ao final de cada implementacao, mantenha esse arquivo atualizado com o que foi implementado. Tanto coisas novas, quanto atualizações
 
 ## Referências Técnicas
 

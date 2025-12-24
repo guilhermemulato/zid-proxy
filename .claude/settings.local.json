@@ -13,7 +13,25 @@
       "Bash(CLAUDE.md )",
       "Bash(INSTALL-PFSENSE.md )",
       "Bash(make build-agent-linux:*)",
-      "Bash(make build-agent-windows:*)"
+      "Bash(make build-agent-windows:*)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy && go get:*)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy &&:*)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy && go build:*)",
+      "Bash(chmod:*)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy && make build-agent-linux-gui:*)",
+      "Bash(./scripts/create-placeholder-binaries.sh:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(docker --version:*)",
+      "Bash(sudo docker ps)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy:*)",
+      "Bash(./build/zid-agent-linux-gui:*)",
+      "Bash(make build-agent-linux-gui:*)",
+      "Bash(make build-agent-windows-gui:*)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy && grep:*)",
+      "Bash(grep -n \"channel\\\\|chan\\\\|goroutine\" cmd/zid-agent/*.go)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy && go mod graph:*)",
+      "Bash(cd /home/guilhermemulato/Nextcloud/Soul\\\\ Solucoes/dev/zid-proxy && go list:*)"
     ]
   }
 }
