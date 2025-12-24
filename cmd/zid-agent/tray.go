@@ -27,6 +27,11 @@ func setupSystemTray(deskApp desktop.App, fyneApp fyne.App, logMgr *agentui.LogM
 		showSettingsWindow(fyneApp, logMgr, cfgMgr)
 	})
 
+	updateItem := fyne.NewMenuItem("Update", func() {
+		logMgr.Add("Starting update flow...")
+		startUpdateFlow(fyneApp, logMgr, version)
+	})
+
 	aboutItem := fyne.NewMenuItem("About", func() {
 		logMgr.Add("Opening about window...")
 		showAboutWindow(fyneApp, statusMgr, cfgMgr, version, buildTime)
@@ -45,6 +50,7 @@ func setupSystemTray(deskApp desktop.App, fyneApp fyne.App, logMgr *agentui.LogM
 		fyne.NewMenuItemSeparator(),
 		showLogsItem,
 		settingsItem,
+		updateItem,
 		aboutItem,
 		fyne.NewMenuItemSeparator(),
 		exitItem,

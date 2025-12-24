@@ -82,16 +82,15 @@ hash_one() {
 }
 
 TMP_SHA="$(mktemp)"
-if [ -f sha256.txt ]; then
-	awk '
-		$2 != "zid-proxy-pfsense-latest.tar.gz" &&
-		$2 != "zid-agent-linux-latest.tar.gz" &&
-		$2 != "zid-agent-windows-latest.tar.gz"
-		{print}
-	' sha256.txt > "${TMP_SHA}" || true
-fi
-
-for out in "${OUT_PFSENSE}" "${OUT_AGENT_LINUX}" "${OUT_AGENT_WINDOWS}"; do
+for out in \
+	"zid-proxy-pfsense-latest.tar.gz" \
+	"zid-agent-linux-latest.tar.gz" \
+	"zid-agent-windows-latest.tar.gz" \
+	"zid-agent-linux-gui-latest.tar.gz" \
+	"zid-agent-windows-gui-latest.tar.gz"; do
+	if [ ! -f "${out}" ]; then
+		continue
+	fi
 	HASH="$(hash_one "${out}" || true)"
 	if [ -n "${HASH}" ]; then
 		printf "%s  %s\n" "${HASH}" "${out}" >> "${TMP_SHA}"

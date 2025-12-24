@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/driver/desktop"
@@ -17,10 +18,26 @@ var (
 
 func main() {
 	showVersion := flag.Bool("version", false, "Show version and exit")
+	applyUpdate := flag.Bool("apply-update", false, "Internal: apply update (Windows helper mode)")
+	updatePID := flag.Int("update-pid", 0, "Internal: pid to wait before swapping")
+	updateTarget := flag.String("update-target", "", "Internal: target path to overwrite")
+	updateNew := flag.String("update-new", "", "Internal: staged new binary path")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("zid-agent version %s (built %s)\n", Version, BuildTime)
+		return
+	}
+
+	if *applyUpdate {
+		logMgr := agentui.NewLogManager(200)
+		if logPath, err := agentui.DefaultLogPath(); err == nil {
+			logMgr.AddSink(agentui.NewFileLogSink(logPath, agentui.DefaultMaxLogBytes))
+		}
+		if err := runApplyUpdateMode(logMgr, *updatePID, *updateTarget, *updateNew); err != nil {
+			logMgr.Addf("Apply-update failed: %v", err)
+			fmt.Fprintf(os.Stderr, "apply-update failed: %v\n", err)
+		}
 		return
 	}
 

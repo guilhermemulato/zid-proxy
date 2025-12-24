@@ -160,16 +160,12 @@ hash_one() {
 }
 
 TMP_SHA="$(mktemp)"
-if [ -f sha256.txt ]; then
-	awk '
-		{gsub(/\r/, "", $2)}
-		$2 != "zid-agent-linux-gui-latest.tar.gz" &&
-		$2 != "zid-agent-windows-gui-latest.tar.gz"
-		{print}
-	' sha256.txt > "${TMP_SHA}" || true
-fi
-
-for out in "${OUT_AGENT_LINUX_GUI}" "${OUT_AGENT_WINDOWS_GUI}"; do
+for out in \
+	"zid-proxy-pfsense-latest.tar.gz" \
+	"zid-agent-linux-latest.tar.gz" \
+	"zid-agent-windows-latest.tar.gz" \
+	"zid-agent-linux-gui-latest.tar.gz" \
+	"zid-agent-windows-gui-latest.tar.gz"; do
 	if [ ! -f "${out}" ]; then
 		continue
 	fi

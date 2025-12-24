@@ -28,6 +28,12 @@ All notable changes to zid-proxy will be documented in this file.
 - zid-agent (Windows/Linux): persistência de logs em `~/.zid-agent/logs.txt` com rotação automática (1MB)
 - zid-agent (Windows/Linux): menu **About** com versão/build e último heartbeat
 
+## [1.0.11.3.2.10] - 2025-12-24
+
+### Added
+- zid-agent (Windows/Linux): menu **Update** baixa o bundle GUI latest do S3 e atualiza automaticamente o binário
+- zid-agent: validação simples para não aplicar update quando `VERSION` do bundle é igual à versão atual
+
 ## [1.0.11.3.2.5] - 2025-12-23
 
 ### Fixed

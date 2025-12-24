@@ -3,7 +3,7 @@
 BINARY=zid-proxy
 LOGROTATE_BINARY=zid-proxy-logrotate
 AGENT_BINARY=zid-agent
-VERSION=1.0.11.3.2.9
+VERSION=1.0.11.3.2.10
 BUILD_DIR=build
 LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION)"
 
